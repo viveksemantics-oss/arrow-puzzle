@@ -7,6 +7,7 @@ import '../widgets/game_header.dart';
 import '../widgets/game_over_dialog.dart';
 import '../widgets/level_completed_dialog.dart';
 import '../widgets/pause_dialog.dart';
+import '../widgets/vector_heart.dart';
 
 /// Full interactive Gameplay Screen for Arrow Maze.
 ///
@@ -233,6 +234,16 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<GameState>(gameControllerProvider, (previous, next) {
+      if (next.isWon && !(previous?.isWon ?? false) && !_dialogOpen) {
+        Future.microtask(() {
+          if (mounted && !_dialogOpen) {
+            _showVictoryDialog();
+          }
+        });
+      }
+    });
+
     final gameState = ref.watch(gameControllerProvider);
     final isEyeComfort = gameState.isEyeComfortTheme;
 
@@ -315,7 +326,7 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
               ),
             ),
 
-            // 3. Lives / Hearts Indicator
+            // 3. Lives / Hearts Indicator (Vector smooth hearts)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Row(
@@ -323,13 +334,10 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
                 children: List.generate(gameState.maxLives, (index) {
                   final hasLife = index < gameState.lives;
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: Icon(
-                      Icons.favorite_rounded,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: VectorHeart(
                       size: 22,
-                      color: hasLife
-                          ? const Color(0xFFEF4444)
-                          : const Color(0xFFCBD5E1),
+                      isFilled: hasLife,
                     ),
                   );
                 }),

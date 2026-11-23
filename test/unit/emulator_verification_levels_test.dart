@@ -27,16 +27,16 @@ void main() {
       // Verify Level 100
       expect(lvl100.levelNumber, equals(100));
       expect(lvl100.difficulty.toLowerCase(), equals('medium'));
-      expect(lvl100.boardSize, equals(24));
-      expect(lvl100.arrows.length, greaterThanOrEqualTo(40)); // 42 arrows
+      expect(lvl100.boardSize, equals(36));
+      expect(lvl100.arrows.length, greaterThanOrEqualTo(100), reason: 'Level 100 must have 100+ arrows');
       final avgLen100 = lvl100.arrows.map((a) => a.allPoints.length).reduce((a, b) => a + b) / lvl100.arrows.length;
-      expect(avgLen100, greaterThanOrEqualTo(4.0), reason: 'Level 100 arrows must be long winding snakes');
+      expect(avgLen100, greaterThanOrEqualTo(4.5), reason: 'Level 100 arrows must be long winding snakes');
 
       // Verify Level 300
       expect(lvl300.levelNumber, equals(300));
-      expect(lvl300.difficulty.toLowerCase(), equals('hard'));
-      expect(lvl300.boardSize, equals(38));
-      expect(lvl300.arrows.length, greaterThanOrEqualTo(100)); // 110 arrows
+      expect(lvl300.difficulty.toLowerCase(), equals('expert'));
+      expect(lvl300.boardSize, equals(60));
+      expect(lvl300.arrows.length, greaterThanOrEqualTo(300), reason: 'Level 300 must have 300+ arrows');
       final avgLen300 = lvl300.arrows.map((a) => a.allPoints.length).reduce((a, b) => a + b) / lvl300.arrows.length;
       expect(avgLen300, greaterThanOrEqualTo(4.5), reason: 'Level 300 arrows must be long winding snakes');
 
@@ -47,7 +47,7 @@ void main() {
       expect(PuzzleSolver.isSolvable(lvl300.createBoard()), isTrue);
     });
 
-    test('Criterion 2: Fewer than 30% of arrows are free at start for levels above 20', () {
+    test('Criterion 2: Fewer than 20% of arrows are free at start for levels above 20', () {
       final testLevels = [21, 24, 25, 40, 50, 100, 200, 300];
 
       for (final lvlNum in testLevels) {
@@ -58,8 +58,8 @@ void main() {
 
         expect(
           freeRatio,
-          lessThan(0.30),
-          reason: 'Level $lvlNum has ${(freeRatio * 100).toStringAsFixed(1)}% free arrows, must be < 30%',
+          lessThan(0.20),
+          reason: 'Level $lvlNum has ${(freeRatio * 100).toStringAsFixed(1)}% free arrows, must be < 20%',
         );
       }
     });
@@ -112,11 +112,9 @@ void main() {
     });
 
     test('Criterion 4: Pinch-zoom coordinates and hit-testing accurately identify arrow', () {
-      // Test segment distance Euclidean hit testing used in ArrowBoardWidget
       final p1 = const Offset(10, 10);
       final p2 = const Offset(10, 50);
 
-      // Tap near the middle of segment (10, 30) with small offset (12, 30)
       final tapNear = const Offset(12, 30);
       final tapFar = const Offset(40, 30);
 

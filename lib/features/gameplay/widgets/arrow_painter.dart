@@ -1,11 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../../core/constants/app_colors.dart';
 import '../engine/arrow_direction.dart';
 import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 
-/// Vector CustomPainter rendering snake-like polyline arrows with slithering exit animations.
+/// Vector CustomPainter rendering thin-line snake polylines with crisp arrowheads and slithering exits.
 class ArrowPainter extends CustomPainter {
   final PuzzleBoard board;
   final Map<String, double> exitProgress; // 0.0 -> 1.0
@@ -65,7 +64,7 @@ class ArrowPainter extends CustomPainter {
   void _drawGrid(Canvas canvas, Size size, double cellSize, int boardSize) {
     final dotColor = isEyeComfortTheme
         ? const Color(0xFFE2D6C5)
-        : AppColors.gridLine.withOpacity(0.5);
+        : const Color(0xFFE2E8F0).withOpacity(0.65);
 
     final dotPaint = Paint()
       ..color = dotColor
@@ -75,7 +74,7 @@ class ArrowPainter extends CustomPainter {
       for (int c = 0; c <= boardSize; c++) {
         canvas.drawCircle(
           Offset(c * cellSize, r * cellSize),
-          1.1,
+          0.85,
           dotPaint,
         );
       }
@@ -84,7 +83,7 @@ class ArrowPainter extends CustomPainter {
 
   void _drawBlockedRay(Canvas canvas, double cellSize) {
     final rayPaint = Paint()
-      ..color = const Color(0x30EF4444)
+      ..color = const Color(0x28EF4444)
       ..style = PaintingStyle.fill;
 
     for (final pt in blockedRay!) {
@@ -94,7 +93,7 @@ class ArrowPainter extends CustomPainter {
         cellSize - 4,
         cellSize - 4,
       );
-      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(6));
+      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
       canvas.drawRRect(rrect, rayPaint);
     }
   }
@@ -113,39 +112,36 @@ class ArrowPainter extends CustomPainter {
     final points = arrow.allPoints;
     if (points.isEmpty) return;
 
-    // Stroke width adapts gracefully to cell size
-    final strokeWidth = math.max(3.5, cellSize * 0.22);
+    // A. LINE STYLE SPEC:
+    // Stroke width = 14% of cell size (min 1.5 px, max 4 px on screen).
+    final strokeWidth = (cellSize * 0.14).clamp(1.5, 4.0);
 
-    // Color resolution
+    // Ink color #1B1B2F on white board; #3E2723 for cream/brown theme
     Color strokeColor;
     if (isShaking || isBlockingFlash) {
-      strokeColor = const Color(0xFFEF4444); // Vibrant Red for blocked feedback
+      strokeColor = const Color(0xFFEF4444); // Red for blocked tap
     } else if (isHinted) {
       strokeColor = const Color(0xFFF59E0B); // Amber for hint
     } else if (isEyeComfortTheme) {
-      strokeColor = const Color(0xFF3E2723); // Sepia / dark espresso ink
+      strokeColor = const Color(0xFF3E2723); // Espresso ink
     } else {
-      strokeColor = const Color(0xFF1E293B); // Deep slate / obsidian ink
+      strokeColor = const Color(0xFF1B1B2F); // Obsidian ink
     }
 
     canvas.save();
 
-    // Blocked shake displacement (perpendicular to direction)
-    double sx = 0.0;
-    double sy = 0.0;
-    if (arrow.direction == ArrowDirection.up || arrow.direction == ArrowDirection.down) {
-      sx = shakeOffset;
-    } else {
-      sy = shakeOffset;
+    // Blocked shake displacement
+    if (shakeOffset.abs() > 0.001) {
+      if (arrow.direction == ArrowDirection.up || arrow.direction == ArrowDirection.down) {
+        canvas.translate(shakeOffset, 0);
+      } else {
+        canvas.translate(0, shakeOffset);
+      }
     }
-    canvas.translate(sx, sy);
 
     if (progress <= 0.001) {
-      // Static arrow on board
       _drawStaticSnake(canvas, arrow, points, cellSize, strokeWidth, strokeColor, isHinted);
     } else {
-      // Slithering exit snake animation:
-      // Head leads along exit ray, body follows through the original polyline!
       _drawSlitheringSnake(
         canvas: canvas,
         arrow: arrow,
@@ -173,29 +169,37 @@ class ArrowPainter extends CustomPainter {
     // Hint Glow
     if (isHinted) {
       final glowPaint = Paint()
-        ..color = const Color(0x66F59E0B)
-        ..strokeWidth = strokeWidth * 2.4
+        ..color = const Color(0x55F59E0B)
+        ..strokeWidth = strokeWidth * 2.8
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
-      _paintPolyline(canvas, points, cellSize, glowPaint);
+      _paintPolyline(canvas, points, cellSize, glowPaint, roundHead: false);
     }
 
     final bodyPaint = Paint()
       ..color = strokeColor
       ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.butt // Butt cap at head prevents any blob/protrusion
+      ..strokeJoin = StrokeJoin.round // Smooth round joins at bends
       ..style = PaintingStyle.stroke;
 
     // Draw snake body polyline
-    _paintPolyline(canvas, points, cellSize, bodyPaint);
+    _paintPolyline(canvas, points, cellSize, bodyPaint, roundHead: false);
 
-    // Draw arrowhead at head
+    // Draw clean round cap explicitly at the tail
+    final tailPt = points.first;
+    final tailCenter = Offset((tailPt.col + 0.5) * cellSize, (tailPt.row + 0.5) * cellSize);
+    final tailPaint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(tailCenter, strokeWidth / 2, tailPaint);
+
+    // Draw crisp arrowhead at head
     final head = arrow.head;
     final hx = (head.col + 0.5) * cellSize;
     final hy = (head.row + 0.5) * cellSize;
-    _paintArrowHead(canvas, Offset(hx, hy), arrow.direction.rotationAngle, strokeColor, cellSize);
+    _paintArrowHead(canvas, Offset(hx, hy), arrow.direction, strokeColor, cellSize);
   }
 
   void _drawSlitheringSnake({
@@ -208,7 +212,6 @@ class ArrowPainter extends CustomPainter {
     required double strokeWidth,
     required Color strokeColor,
   }) {
-    // Build extended trajectory: [tail, ..., head, head + 1*dir, ..., head + exitLen*dir]
     final exitCells = boardSize + 2;
     final trajectory = <Offset>[];
     for (final pt in points) {
@@ -223,26 +226,23 @@ class ArrowPainter extends CustomPainter {
     }
 
     final bodySegCount = points.length - 1;
-
-    // Total distance the snake must travel to fully exit
     final totalDistance = (bodySegCount + exitCells).toDouble();
     final dTraveled = progress * totalDistance;
 
     final sTail = dTraveled;
     final sHead = math.min(sTail + bodySegCount, totalDistance);
 
-    if (sTail >= totalDistance) return; // Completely exited
+    if (sTail >= totalDistance) return;
 
-    // Sample active polyline between sTail and sHead
     final activePoints = _sampleSubPolyline(trajectory, sTail, sHead);
     if (activePoints.length < 2) return;
 
-    final opacity = (1.0 - progress * 0.8).clamp(0.0, 1.0);
+    final opacity = (1.0 - progress * 0.75).clamp(0.0, 1.0);
 
     final bodyPaint = Paint()
       ..color = strokeColor.withOpacity(opacity)
       ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
+      ..strokeCap = StrokeCap.butt
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
@@ -253,18 +253,22 @@ class ArrowPainter extends CustomPainter {
     }
     canvas.drawPath(path, bodyPaint);
 
-    // Arrowhead at active head
-    final headPt = activePoints.last;
-    final prevPt = activePoints[activePoints.length - 2];
-    final angle = math.atan2(headPt.dy - prevPt.dy, headPt.dx - prevPt.dx) + math.pi / 2;
+    // Draw round cap at moving tail
+    final tailPaint = Paint()
+      ..color = strokeColor.withOpacity(opacity)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(activePoints.first, strokeWidth / 2, tailPaint);
 
-    _paintArrowHead(canvas, headPt, angle, strokeColor.withOpacity(opacity), cellSize);
+    // Draw arrowhead at moving head
+    if (sHead < totalDistance) {
+      _paintArrowHead(canvas, activePoints.last, arrow.direction, strokeColor.withOpacity(opacity), cellSize);
+    }
   }
 
   List<Offset> _sampleSubPolyline(List<Offset> trajectory, double sStart, double sEnd) {
-    final result = <Offset>[];
+    if (sEnd <= sStart || trajectory.length < 2) return [];
 
-    // Clamped indices
+    final result = <Offset>[];
     final iStart = sStart.floor().clamp(0, trajectory.length - 2);
     final fStart = sStart - iStart;
     final pStart = Offset.lerp(trajectory[iStart], trajectory[iStart + 1], fStart)!;
@@ -285,7 +289,13 @@ class ArrowPainter extends CustomPainter {
     return result;
   }
 
-  void _paintPolyline(Canvas canvas, List<GridPoint> points, double cellSize, Paint paint) {
+  void _paintPolyline(
+    Canvas canvas,
+    List<GridPoint> points,
+    double cellSize,
+    Paint paint, {
+    required bool roundHead,
+  }) {
     if (points.length == 1) {
       final p = points.first;
       final c = Offset((p.col + 0.5) * cellSize, (p.row + 0.5) * cellSize);
@@ -305,26 +315,36 @@ class ArrowPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
-  void _paintArrowHead(Canvas canvas, Offset position, double rotationAngle, Color color, double cellSize) {
+  /// Draws a clean, crisp triangle arrowhead about 0.5 x cell size with no round-cap blobs.
+  void _paintArrowHead(
+    Canvas canvas,
+    Offset position,
+    ArrowDirection direction,
+    Color color,
+    double cellSize,
+  ) {
     canvas.save();
     canvas.translate(position.dx, position.dy);
-    canvas.rotate(rotationAngle);
+    canvas.rotate(direction.rotationAngle);
 
-    final headSize = math.max(6.5, cellSize * 0.38);
+    // Arrowhead size: about 0.5 x cell size
+    final headLen = cellSize * 0.48;
+    final halfWidth = cellSize * 0.22;
+
     final fillPaint = Paint()
       ..color = color
-      ..style = PaintingStyle.fill;
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
 
-    // Sleek geometric triangle arrowhead
+    // Symmetrical crisp triangle: tip pointing in direction, base centered at cell center
     final path = Path()
-      ..moveTo(0, -headSize) // Tip
-      ..lineTo(-headSize * 0.72, headSize * 0.42)
-      ..lineTo(0, 0.05 * headSize) // Inward notch
-      ..lineTo(headSize * 0.72, headSize * 0.42)
+      ..moveTo(0, -headLen * 0.55) // Tip pointing forward
+      ..lineTo(-halfWidth, headLen * 0.45) // Left base
+      ..lineTo(0, headLen * 0.15) // Slight modern inward notch
+      ..lineTo(halfWidth, headLen * 0.45) // Right base
       ..close();
 
     canvas.drawPath(path, fillPaint);
-
     canvas.restore();
   }
 

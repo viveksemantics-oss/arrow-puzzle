@@ -44,42 +44,45 @@ class GameHeader extends StatelessWidget {
         : const Color(0xFF64748B);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Left: Pause Button & Theme Toggle
-          Row(
-            children: [
-              IconButton(
-                onPressed: onPause,
-                icon: const Icon(Icons.pause_circle_outline_rounded, size: 30),
-                color: textColor,
-                tooltip: 'Pause',
-              ),
-              if (onToggleTheme != null)
-                IconButton(
-                  onPressed: onToggleTheme,
-                  icon: Icon(
-                    isEyeComfortTheme
-                        ? Icons.palette_rounded
-                        : Icons.palette_outlined,
-                    size: 22,
-                  ),
-                  color: pillText,
-                  tooltip: 'Switch Theme',
-                ),
-            ],
+          IconButton(
+            onPressed: onPause,
+            icon: const Icon(Icons.pause_circle_outline_rounded, size: 28),
+            color: textColor,
+            tooltip: 'Pause',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
+          if (onToggleTheme != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: onToggleTheme,
+              icon: Icon(
+                isEyeComfortTheme
+                    ? Icons.palette_rounded
+                    : Icons.palette_outlined,
+                size: 20,
+              ),
+              color: pillText,
+              tooltip: 'Switch Theme',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
 
-          // Center: Level Title & Tier Badge Pill (Exact match to screenshot)
+          const Spacer(),
+
+          // Center: Level Title & Tier Badge Pill
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 isDaily ? 'Daily Challenge' : 'Level $levelNumber',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: textColor,
                   letterSpacing: -0.5,
@@ -87,43 +90,46 @@ class GameHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
                 decoration: BoxDecoration(
                   color: pillBg,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   difficulty.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w700,
                     color: pillText,
-                    letterSpacing: 0.6,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
             ],
           ),
 
+          const Spacer(),
+
           // Right: Timer Pill with Stopwatch Icon
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: pillBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   Icons.timer_outlined,
-                  size: 16,
+                  size: 15,
                   color: pillText,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   _formatTime(elapsedSeconds),
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: textColor,
                   ),

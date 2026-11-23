@@ -4,7 +4,7 @@ import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 import 'arrow_painter.dart';
 
-/// Interactive Puzzle Board Widget with pinch-to-zoom, pan, and accurate polyline hit-testing.
+/// Interactive Puzzle Board Widget with card auto-fit, pinch-to-zoom, pan, and sub-cell polyline hit-testing.
 class ArrowBoardWidget extends StatefulWidget {
   final PuzzleBoard board;
   final Function(String arrowId) onArrowTapped;
@@ -123,7 +123,7 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     controller.forward();
   }
 
-  /// Resets all visual animations.
+  /// Clears ongoing animations.
   void resetAnimations() {
     for (final c in _exitControllers.values) {
       c.dispose();
@@ -143,12 +143,11 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
   }
 
   /// Handles touch event by performing distance hit-testing against arrow polyline segments.
-  void _handleTap(Offset localPosition, double boardWidth) {
-    final cellSize = boardWidth / widget.board.size;
+  void _handleTap(Offset localPosition, double cellSize) {
     String? closestArrowId;
     double minDistance = double.infinity;
-    // Comfortable touch radius adapting to zoom and screen density
-    final maxTouchDistance = math.max(cellSize * 0.85, 14.0);
+    // SPEC A: Use a hit tolerance of about 0.45 x cell size around the line (touch area generous)
+    final maxTouchDistance = cellSize * 0.45;
 
     for (final arrow in widget.board.arrows.values) {
       if (!arrow.isActive) continue;
@@ -204,51 +203,77 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final dimension = math.min(constraints.maxWidth, constraints.maxHeight);
-        final padding = math.max(8.0, dimension * 0.03);
-        final boardDimension = dimension - padding * 2;
+        final cardW = constraints.maxWidth;
+        final cardH = constraints.maxHeight;
+        const padding = 12.0;
 
-        return Center(
-          child: Container(
-            width: dimension,
-            height: dimension,
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x0C000000),
-                  blurRadius: 22,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            padding: EdgeInsets.all(padding),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: InteractiveViewer(
-                transformationController: _transformationController,
-                minScale: 0.8,
-                maxScale: 4.0,
-                boundaryMargin: const EdgeInsets.all(32.0),
-                clipBehavior: Clip.hardEdge,
-                child: Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: (details) =>
-                        _handleTap(details.localPosition, boardDimension),
-                    child: RepaintBoundary(
-                      child: CustomPaint(
-                        size: Size(boardDimension, boardDimension),
-                        painter: ArrowPainter(
-                          board: widget.board,
-                          exitProgress: _exitProgress,
-                          shakeOffsets: _shakeOffsets,
-                          activeHintId: widget.activeHintId,
-                          activeBlockedId: _activeBlockedId,
-                          blockedRay: _activeBlockedRay,
-                          isEyeComfortTheme: widget.isEyeComfortTheme,
-                        ),
+        final availW = cardW - padding * 2;
+        final availH = cardH - padding * 2;
+
+        // SPEC C: Compute cell size from the level's mask bounding box
+        int minR = widget.board.size, maxR = 0, minC = widget.board.size, maxC = 0;
+        for (final arrow in widget.board.arrows.values) {
+          for (final pt in arrow.allPoints) {
+            if (pt.row < minR) minR = pt.row;
+            if (pt.row > maxR) maxR = pt.row;
+            if (pt.col < minC) minC = pt.col;
+            if (pt.col > maxC) maxC = pt.col;
+          }
+        }
+        if (minR > maxR) {
+          minR = 0;
+          maxR = widget.board.size - 1;
+          minC = 0;
+          maxC = widget.board.size - 1;
+        }
+
+        final boundingCols = (maxC - minC + 1).toDouble();
+        final boundingRows = (maxR - minR + 1).toDouble();
+
+        // Fit silhouette bounding box into available card space
+        final cellSize = math.min(availW / boundingCols, availH / boundingRows) * 0.94;
+        final boardTotalW = widget.board.size * cellSize;
+        final boardTotalH = widget.board.size * cellSize;
+
+        // SPEC C: Card = white, 24px rounded corners, soft shadow only (NO thick black border, NO hatched corners)
+        return Container(
+          width: cardW,
+          height: cardH,
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 18,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(padding),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: InteractiveViewer(
+              transformationController: _transformationController,
+              minScale: 0.6,
+              maxScale: 4.5,
+              boundaryMargin: const EdgeInsets.all(24.0),
+              clipBehavior: Clip.hardEdge,
+              child: Center(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (details) => _handleTap(details.localPosition, cellSize),
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      size: Size(boardTotalW, boardTotalH),
+                      painter: ArrowPainter(
+                        board: widget.board,
+                        exitProgress: _exitProgress,
+                        shakeOffsets: _shakeOffsets,
+                        activeHintId: widget.activeHintId,
+                        activeBlockedId: _activeBlockedId,
+                        blockedRay: _activeBlockedRay,
+                        isEyeComfortTheme: widget.isEyeComfortTheme,
                       ),
                     ),
                   ),
