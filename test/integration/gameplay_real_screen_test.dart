@@ -6,14 +6,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:arrow_escape/core/services/admob_service.dart';
-import 'package:arrow_escape/core/services/purchase_service.dart';
-import 'package:arrow_escape/core/storage/storage_service.dart';
-import 'package:arrow_escape/core/utils/sound_manager.dart';
-import 'package:arrow_escape/features/gameplay/engine/level_repository.dart';
-import 'package:arrow_escape/features/gameplay/providers/game_providers.dart';
-import 'package:arrow_escape/features/gameplay/screens/gameplay_screen.dart';
-import 'package:arrow_escape/features/gameplay/widgets/level_completed_dialog.dart';
+import 'package:eklavyas_aim/core/services/admob_service.dart';
+import 'package:eklavyas_aim/core/services/purchase_service.dart';
+import 'package:eklavyas_aim/core/storage/storage_service.dart';
+import 'package:eklavyas_aim/core/utils/sound_manager.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/level_repository.dart';
+import 'package:eklavyas_aim/features/gameplay/providers/game_providers.dart';
+import 'package:eklavyas_aim/features/gameplay/screens/gameplay_screen.dart';
+import 'package:eklavyas_aim/features/gameplay/widgets/game_over_dialog.dart';
+import 'package:eklavyas_aim/features/gameplay/widgets/level_completed_dialog.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -163,5 +164,46 @@ void main() {
         });
       });
     }
+
+    testWidgets('Capture Game Over Rewarded Ad Dialog Screen', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2340);
+      tester.view.devicePixelRatio = 2.625;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repaintKey = GlobalKey();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: RepaintBoundary(
+            key: repaintKey,
+            child: Scaffold(
+              backgroundColor: const Color(0xFFF7F8FA),
+              body: Center(
+                child: GameOverDialog(
+                  onWatchAd: () {},
+                  onRetry: () {},
+                  onQuit: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.runAsync(() async {
+        final boundary = repaintKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 1.5);
+        final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+        final bytes = byteData!.buffer.asUint8List();
+
+        File('build/screenshots/game_over_rewarded_ad.png').writeAsBytesSync(bytes);
+        File('$artifactDir/screenshots/game_over_rewarded_ad.png').writeAsBytesSync(bytes);
+        File('$artifactDir/game_over_rewarded_ad.png').writeAsBytesSync(bytes);
+      });
+    });
   });
 }

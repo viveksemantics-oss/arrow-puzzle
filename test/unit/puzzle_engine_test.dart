@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:arrow_escape/features/gameplay/engine/arrow_direction.dart';
-import 'package:arrow_escape/features/gameplay/engine/arrow_model.dart';
-import 'package:arrow_escape/features/gameplay/engine/move_result.dart';
-import 'package:arrow_escape/features/gameplay/engine/puzzle_board.dart';
-import 'package:arrow_escape/features/gameplay/engine/puzzle_engine.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_direction.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_model.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/move_result.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/puzzle_board.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/puzzle_engine.dart';
 
 void main() {
   group('ArrowDirection Tests', () {
@@ -38,7 +38,7 @@ void main() {
 
   group('PuzzleBoard & Raycasting Tests', () {
     test('Unblocked arrow points out of board', () {
-      final arrow = const ArrowModel(
+      final arrow = ArrowModel(
         id: 'a1',
         row: 0,
         col: 0,
@@ -52,13 +52,13 @@ void main() {
 
     test('Blocked arrow detects blocker in its trajectory', () {
       // a1 at (1, 1) pointing UP, blocked by a2 at (0, 1)
-      final a1 = const ArrowModel(
+      final a1 = ArrowModel(
         id: 'a1',
         row: 1,
         col: 1,
         direction: ArrowDirection.up,
       );
-      final a2 = const ArrowModel(
+      final a2 = ArrowModel(
         id: 'a2',
         row: 0,
         col: 1,
@@ -73,13 +73,13 @@ void main() {
     });
 
     test('Inactive arrow does not block path', () {
-      final a1 = const ArrowModel(
+      final a1 = ArrowModel(
         id: 'a1',
         row: 2,
         col: 0,
         direction: ArrowDirection.up,
       );
-      final a2 = const ArrowModel(
+      final a2 = ArrowModel(
         id: 'a2',
         row: 1,
         col: 0,
@@ -102,13 +102,13 @@ void main() {
       // (0, 1) -> DOWN  (a2)
       // a1 points into (0, 1) which has a2, so a1 is blocked by a2
       // a2 points down into (1, 1) which is empty, so a2 is clear!
-      final a1 = const ArrowModel(
+      final a1 = ArrowModel(
         id: 'a1',
         row: 0,
         col: 0,
         direction: ArrowDirection.right,
       );
-      final a2 = const ArrowModel(
+      final a2 = ArrowModel(
         id: 'a2',
         row: 0,
         col: 1,

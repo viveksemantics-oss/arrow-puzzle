@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../gameplay/providers/game_providers.dart';
+import '../gameplay/widgets/banner_ad_widget.dart';
 
 /// Level Select Screen supporting 10,000+ levels with difficulty tiers and star ratings.
 class LevelSelectScreen extends ConsumerStatefulWidget {
@@ -16,18 +17,32 @@ class _LevelSelectScreenState extends ConsumerState<LevelSelectScreen>
   late TabController _tabController;
 
   final List<Map<String, dynamic>> _tiers = [
-    {'name': 'Beginner (1-25)', 'range': [1, 25]},
-    {'name': 'Easy (26-60)', 'range': [26, 60]},
-    {'name': 'Medium (61-150)', 'range': [61, 150]},
-    {'name': 'Hard (151-300)', 'range': [151, 300]},
-    {'name': 'Expert (301-500)', 'range': [301, 500]},
-    {'name': 'Master (501-1000)', 'range': [501, 1000]},
+    {'name': 'Beginner (1-10)', 'range': [1, 10]},
+    {'name': 'Easy (11-40)', 'range': [11, 40]},
+    {'name': 'Medium (41-100)', 'range': [41, 100]},
+    {'name': 'Hard (101-250)', 'range': [101, 250]},
+    {'name': 'Expert (251-500)', 'range': [251, 500]},
+    {'name': 'Master (501+)', 'range': [501, 1000]},
   ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tiers.length, vsync: this);
+    final storage = ref.read(storageProvider);
+    final curLevel = storage.currentLevel;
+    int initialTab = 0;
+    for (int i = 0; i < _tiers.length; i++) {
+      final range = _tiers[i]['range'] as List<int>;
+      if (curLevel >= range[0] && curLevel <= range[1]) {
+        initialTab = i;
+        break;
+      }
+    }
+    _tabController = TabController(
+      length: _tiers.length,
+      vsync: this,
+      initialIndex: initialTab,
+    );
   }
 
   @override
@@ -101,6 +116,7 @@ class _LevelSelectScreenState extends ConsumerState<LevelSelectScreen>
           );
         }).toList(),
       ),
+      bottomNavigationBar: const BannerAdWidget(),
     );
   }
 }

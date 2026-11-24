@@ -1,8 +1,8 @@
 // ignore_for_file: avoid_print
 import 'dart:convert';
 import 'dart:io';
-import 'package:arrow_escape/features/gameplay/generator/procedural_generator.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/features/gameplay/generator/procedural_generator.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   final levels = <String, dynamic>{};

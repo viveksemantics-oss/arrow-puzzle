@@ -1,7 +1,7 @@
 import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 
-/// Represents a configured level in Arrow Maze.
+/// Represents a configured level in Eklavya's Aim.
 class LevelModel {
   final int levelNumber;
   final int boardSize;

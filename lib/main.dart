@@ -59,7 +59,7 @@ void main() async {
           purchaseProvider.overrideWithValue(purchaseService),
           levelRepoProvider.overrideWithValue(levelRepo),
         ],
-        child: const ArrowEscapeApp(),
+        child: const EklavyasAimApp(),
       ),
     );
 

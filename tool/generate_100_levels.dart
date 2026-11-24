@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:arrow_escape/features/gameplay/models/level_model.dart';
-import 'package:arrow_escape/features/gameplay/solver/level_generator.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/features/gameplay/models/level_model.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/level_generator.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   stdout.writeln('=== Generating and Validating 100 Curated Levels ===');

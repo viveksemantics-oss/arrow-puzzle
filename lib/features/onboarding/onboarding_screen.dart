@@ -17,7 +17,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   final List<Map<String, dynamic>> _pages = [
     {
-      'title': 'Welcome to Arrow Escape',
+      'title': "Welcome to Eklavya's Aim",
       'subtitle': 'A minimalist brain-training puzzle game of order and logic.',
       'icon': Icons.extension_rounded,
       'color': AppColors.buttonDark,

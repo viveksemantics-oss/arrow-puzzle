@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../gameplay/widgets/banner_ad_widget.dart';
 import '../gameplay/providers/game_providers.dart';
 
 /// Main Menu Screen displaying progress, play actions, and feature navigation.
@@ -78,7 +79,7 @@ class MainMenuScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 18),
               const Text(
-                'Arrow Maze',
+                "Eklavya's Aim",
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
@@ -172,6 +173,10 @@ class MainMenuScreen extends ConsumerWidget {
                   color: AppColors.textMuted,
                 ),
               ),
+              const SizedBox(height: 8),
+
+              // Banner Ad
+              const BannerAdWidget(),
             ],
           ),
         ),

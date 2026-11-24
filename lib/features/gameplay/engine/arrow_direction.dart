@@ -89,6 +89,14 @@ enum ArrowDirection {
     }
   }
 
+  static ArrowDirection fromDelta(int dr, int dc) {
+    if (dr == -1 && dc == 0) return ArrowDirection.up;
+    if (dr == 1 && dc == 0) return ArrowDirection.down;
+    if (dr == 0 && dc == -1) return ArrowDirection.left;
+    if (dr == 0 && dc == 1) return ArrowDirection.right;
+    throw ArgumentError('Invalid delta ($dr, $dc) for cardinal direction');
+  }
+
   static ArrowDirection fromString(String str) {
     switch (str.toLowerCase()) {
       case 'up':

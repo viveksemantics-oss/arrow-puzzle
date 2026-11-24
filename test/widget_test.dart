@@ -2,18 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:arrow_escape/app/theme.dart';
-import 'package:arrow_escape/core/services/admob_service.dart';
-import 'package:arrow_escape/core/services/purchase_service.dart';
-import 'package:arrow_escape/core/storage/storage_service.dart';
-import 'package:arrow_escape/core/utils/sound_manager.dart';
-import 'package:arrow_escape/features/daily_challenge/daily_challenge_screen.dart';
-import 'package:arrow_escape/features/gameplay/engine/level_repository.dart';
-import 'package:arrow_escape/features/gameplay/providers/game_providers.dart';
-import 'package:arrow_escape/features/gameplay/screens/gameplay_screen.dart';
-import 'package:arrow_escape/features/home/main_menu_screen.dart';
-import 'package:arrow_escape/features/levels/level_select_screen.dart';
-import 'package:arrow_escape/features/statistics/statistics_screen.dart';
+import 'package:eklavyas_aim/app/theme.dart';
+import 'package:eklavyas_aim/core/services/admob_service.dart';
+import 'package:eklavyas_aim/core/services/purchase_service.dart';
+import 'package:eklavyas_aim/core/storage/storage_service.dart';
+import 'package:eklavyas_aim/core/utils/sound_manager.dart';
+import 'package:eklavyas_aim/features/daily_challenge/daily_challenge_screen.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/level_repository.dart';
+import 'package:eklavyas_aim/features/gameplay/providers/game_providers.dart';
+import 'package:eklavyas_aim/features/gameplay/screens/gameplay_screen.dart';
+import 'package:eklavyas_aim/features/home/main_menu_screen.dart';
+import 'package:eklavyas_aim/features/levels/level_select_screen.dart';
+import 'package:eklavyas_aim/features/statistics/statistics_screen.dart';
 
 void main() {
   late StorageService storage;
@@ -61,7 +61,7 @@ void main() {
     await tester.pumpWidget(buildTestableWidget(const MainMenuScreen()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Arrow Maze'), findsOneWidget);
+    expect(find.text("Eklavya's Aim"), findsOneWidget);
     expect(find.text('Level Select'), findsOneWidget);
     expect(find.text('Daily Challenge'), findsOneWidget);
     expect(find.text('Statistics'), findsOneWidget);

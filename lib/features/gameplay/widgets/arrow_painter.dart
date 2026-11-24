@@ -1,27 +1,55 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../game/animation_config.dart';
 import '../engine/arrow_direction.dart';
 import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 
-/// Vector CustomPainter rendering thin-line snake polylines with crisp arrowheads and slithering exits.
+enum ArrowLayerMode { all, staticOnly, dynamicOnly }
+
+/// CustomPainter rendering thin-line snake polylines with clean solid triangle arrowheads.
+///
+/// Specifications:
+/// - Stroke width = 0.16 x cellSize (never thicker than 0.20 x cellSize, clamped 1.5 to 4.0 px)
+/// - Ink color: #1B1B2F on white board; #3E2723 on cream/brown eye-comfort theme
+/// - Round cap at tail, round join at bends, smooth 0.25 x cellSize rounded corners
+/// - Arrowhead: clean SOLID TRIANGLE, no notch, no outline.
+///   Length = 0.55 x cellSize, base width = 0.50 x cellSize.
+///   Tip at head cell center + 0.35 x cellSize in exit direction.
+///   Base center at head cell center - 0.20 x cellSize in exit direction.
+///   Line terminates exactly at base center: zero gap, zero overlap blob.
+/// - Tap highlight: tapped arrow & its exit ray in bright blue (#1E88FF)
 class ArrowPainter extends CustomPainter {
   final PuzzleBoard board;
+  final Map<String, ArrowModel> exitingArrows;
   final Map<String, double> exitProgress; // 0.0 -> 1.0
   final Map<String, double> shakeOffsets; // pixel offset
   final String? activeHintId;
   final String? activeBlockedId; // ID of arrow that blocked the move (flashes red)
   final List<GridPoint>? blockedRay;
+  final String? selectedArrowId; // ID of tapped arrow (flashes bright blue #1E88FF)
+  final List<GridPoint>? selectedRay; // Exit ray of tapped arrow (bright blue #1E88FF)
   final bool isEyeComfortTheme;
+  final bool showHitAreas;
+  final ArrowLayerMode layerMode;
+  final int staticRevision;
 
   ArrowPainter({
+    super.repaint,
     required this.board,
+    this.exitingArrows = const {},
     this.exitProgress = const {},
     this.shakeOffsets = const {},
     this.activeHintId,
     this.activeBlockedId,
     this.blockedRay,
+    this.selectedArrowId,
+    this.selectedRay,
     this.isEyeComfortTheme = false,
+    this.showHitAreas = false,
+    this.layerMode = ArrowLayerMode.all,
+    this.staticRevision = 0,
   });
 
   @override
@@ -29,35 +57,116 @@ class ArrowPainter extends CustomPainter {
     final boardSize = board.size;
     final cellSize = size.width / boardSize;
 
-    // 1. Draw subtle dot grid
-    _drawGrid(canvas, size, cellSize, boardSize);
+    final drawStatic = layerMode == ArrowLayerMode.all || layerMode == ArrowLayerMode.staticOnly;
+    final drawDynamic = layerMode == ArrowLayerMode.all || layerMode == ArrowLayerMode.dynamicOnly;
 
-    // 2. Draw blocked ray indication (if any)
-    if (blockedRay != null && blockedRay!.isNotEmpty) {
-      _drawBlockedRay(canvas, cellSize);
+    if (drawStatic) {
+      // 1. Draw subtle dot grid
+      _drawGrid(canvas, size, cellSize, boardSize);
+
+      // 2. Debug-only hit area tolerance overlay
+      if (kDebugMode && showHitAreas) {
+        _drawDebugHitAreas(canvas, cellSize);
+      }
+
+      // 3. Draw Static Active Snake Arrows
+      for (final arrow in board.arrows.values) {
+        if (!arrow.isActive || exitingArrows.containsKey(arrow.id)) continue;
+        final hasDynamicShake = (shakeOffsets[arrow.id] ?? 0.0).abs() > 0.001;
+        final isDynamic = hasDynamicShake || arrow.id == activeBlockedId || arrow.id == selectedArrowId;
+        if (layerMode == ArrowLayerMode.staticOnly && isDynamic) continue;
+
+        _drawSnakeArrow(
+          canvas: canvas,
+          arrow: arrow,
+          cellSize: cellSize,
+          boardSize: boardSize,
+          progress: 0.0,
+          shakeOffset: shakeOffsets[arrow.id] ?? 0.0,
+          isHinted: arrow.id == activeHintId || arrow.isHighlighted,
+          isShaking: arrow.isShaking,
+          isBlockingFlash: arrow.id == activeBlockedId,
+          isSelected: arrow.id == selectedArrowId,
+        );
+      }
     }
 
-    // 3. Draw All Snake Arrows
+    if (drawDynamic) {
+      // 4. Draw selected arrow exit ray (bright blue #1E88FF on tap)
+      if (selectedRay != null && selectedRay!.isNotEmpty) {
+        _drawSelectedRay(canvas, cellSize);
+      }
+
+      // 5. Draw blocked ray indication (red flash on blocked move)
+      if (blockedRay != null && blockedRay!.isNotEmpty) {
+        _drawBlockedRay(canvas, cellSize);
+      }
+
+      // 6. Draw shaking / flashing / selected active arrows on top layer
+      if (layerMode == ArrowLayerMode.dynamicOnly) {
+        for (final arrow in board.arrows.values) {
+          if (!arrow.isActive || exitingArrows.containsKey(arrow.id)) continue;
+          final shake = shakeOffsets[arrow.id] ?? 0.0;
+          final isDynamic = shake.abs() > 0.001 || arrow.id == activeBlockedId || arrow.id == selectedArrowId;
+          if (!isDynamic) continue;
+
+          _drawSnakeArrow(
+            canvas: canvas,
+            arrow: arrow,
+            cellSize: cellSize,
+            boardSize: boardSize,
+            progress: 0.0,
+            shakeOffset: shake,
+            isHinted: arrow.id == activeHintId || arrow.isHighlighted,
+            isShaking: arrow.isShaking || shake.abs() > 0.001,
+            isBlockingFlash: arrow.id == activeBlockedId,
+            isSelected: arrow.id == selectedArrowId,
+          );
+        }
+      }
+
+      // 7. Draw Sliding-Out Arrows independently
+      for (final arrow in exitingArrows.values) {
+        final progress = exitProgress[arrow.id] ?? 0.0;
+        if (progress >= 1.0) continue;
+        _drawSnakeArrow(
+          canvas: canvas,
+          arrow: arrow,
+          cellSize: cellSize,
+          boardSize: boardSize,
+          progress: progress,
+          shakeOffset: 0.0,
+          isHinted: false,
+          isShaking: false,
+          isBlockingFlash: false,
+          isSelected: arrow.id == selectedArrowId,
+        );
+      }
+    }
+  }
+
+  void _drawDebugHitAreas(Canvas canvas, double cellSize) {
+    final tolerance = cellSize * 0.30;
     for (final arrow in board.arrows.values) {
-      final progress = exitProgress[arrow.id] ?? (arrow.isActive ? 0.0 : 1.0);
-      if (progress >= 1.0) continue; // Fully exited off screen
+      if (!arrow.isActive || exitingArrows.containsKey(arrow.id)) continue;
+      final isSel = arrow.id == selectedArrowId;
+      final paint = Paint()
+        ..color = (isSel ? const Color(0xFFFF9800) : const Color(0xFF10B981))
+            .withOpacity(isSel ? 0.35 : 0.18)
+        ..strokeWidth = tolerance * 2
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
 
-      final shake = shakeOffsets[arrow.id] ?? 0.0;
-      final isHinted = arrow.id == activeHintId || arrow.isHighlighted;
-      final isShaking = arrow.isShaking || shake.abs() > 0.01;
-      final isBlockingFlash = arrow.id == activeBlockedId;
-
-      _drawSnakeArrow(
-        canvas: canvas,
-        arrow: arrow,
-        cellSize: cellSize,
-        boardSize: boardSize,
-        progress: progress,
-        shakeOffset: shake,
-        isHinted: isHinted,
-        isShaking: isShaking,
-        isBlockingFlash: isBlockingFlash,
-      );
+      final pts = arrow.allPoints;
+      if (pts.length >= 2) {
+        final path = Path();
+        path.moveTo((pts.first.col + 0.5) * cellSize, (pts.first.row + 0.5) * cellSize);
+        for (int i = 1; i < pts.length; i++) {
+          path.lineTo((pts[i].col + 0.5) * cellSize, (pts[i].row + 0.5) * cellSize);
+        }
+        canvas.drawPath(path, paint);
+      }
     }
   }
 
@@ -81,10 +190,38 @@ class ArrowPainter extends CustomPainter {
     }
   }
 
+  void _drawSelectedRay(Canvas canvas, double cellSize) {
+    final rayFill = Paint()
+      ..color = const Color(0x301E88FF)
+      ..style = PaintingStyle.fill;
+
+    final rayBorder = Paint()
+      ..color = const Color(0x801E88FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    for (final pt in selectedRay!) {
+      final rect = Rect.fromLTWH(
+        pt.col * cellSize + 2.5,
+        pt.row * cellSize + 2.5,
+        cellSize - 5,
+        cellSize - 5,
+      );
+      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(5));
+      canvas.drawRRect(rrect, rayFill);
+      canvas.drawRRect(rrect, rayBorder);
+    }
+  }
+
   void _drawBlockedRay(Canvas canvas, double cellSize) {
     final rayPaint = Paint()
       ..color = const Color(0x28EF4444)
       ..style = PaintingStyle.fill;
+
+    final rayBorder = Paint()
+      ..color = const Color(0x60EF4444)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
 
     for (final pt in blockedRay!) {
       final rect = Rect.fromLTWH(
@@ -95,6 +232,7 @@ class ArrowPainter extends CustomPainter {
       );
       final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(4));
       canvas.drawRRect(rrect, rayPaint);
+      canvas.drawRRect(rrect, rayBorder);
     }
   }
 
@@ -108,31 +246,39 @@ class ArrowPainter extends CustomPainter {
     required bool isHinted,
     required bool isShaking,
     required bool isBlockingFlash,
+    required bool isSelected,
   }) {
     final points = arrow.allPoints;
-    if (points.isEmpty) return;
+    if (points.length < 2) return;
 
-    // A. LINE STYLE SPEC:
-    // Stroke width = 14% of cell size (min 1.5 px, max 4 px on screen).
-    final strokeWidth = (cellSize * 0.14).clamp(1.5, 4.0);
+    // Stroke width = 16% of cell size (never thicker than 0.20 x cellSize, clamped 1.5 to 4.0 px)
+    final strokeWidth = (cellSize * 0.16).clamp(1.5, 4.0);
 
-    // Ink color #1B1B2F on white board; #3E2723 for cream/brown theme
+    // Color resolution:
+    // Selected tap = #1E88FF (Bright Blue)
+    // Shaking / blocked flash = #EF4444 (Red)
+    // Hinted = #F59E0B (Amber)
+    // Eye comfort = #3E2723 (Espresso ink)
+    // Default = #1B1B2F (Obsidian ink)
     Color strokeColor;
     if (isShaking || isBlockingFlash) {
-      strokeColor = const Color(0xFFEF4444); // Red for blocked tap
+      strokeColor = const Color(0xFFEF4444);
+    } else if (isSelected) {
+      strokeColor = const Color(0xFF1E88FF);
     } else if (isHinted) {
-      strokeColor = const Color(0xFFF59E0B); // Amber for hint
+      strokeColor = const Color(0xFFF59E0B);
     } else if (isEyeComfortTheme) {
-      strokeColor = const Color(0xFF3E2723); // Espresso ink
+      strokeColor = const Color(0xFF3E2723);
     } else {
-      strokeColor = const Color(0xFF1B1B2F); // Obsidian ink
+      strokeColor = const Color(0xFF1B1B2F);
     }
 
     canvas.save();
 
     // Blocked shake displacement
     if (shakeOffset.abs() > 0.001) {
-      if (arrow.direction == ArrowDirection.up || arrow.direction == ArrowDirection.down) {
+      if (arrow.direction == ArrowDirection.up ||
+          arrow.direction == ArrowDirection.down) {
         canvas.translate(shakeOffset, 0);
       } else {
         canvas.translate(0, shakeOffset);
@@ -140,7 +286,7 @@ class ArrowPainter extends CustomPainter {
     }
 
     if (progress <= 0.001) {
-      _drawStaticSnake(canvas, arrow, points, cellSize, strokeWidth, strokeColor, isHinted);
+      _drawStaticSnake(canvas, arrow, points, cellSize, strokeWidth, strokeColor, isHinted, isSelected);
     } else {
       _drawSlitheringSnake(
         canvas: canvas,
@@ -165,41 +311,135 @@ class ArrowPainter extends CustomPainter {
     double strokeWidth,
     Color strokeColor,
     bool isHinted,
+    bool isSelected,
   ) {
-    // Hint Glow
-    if (isHinted) {
+    final dir = arrow.direction;
+    final dirVec = Offset(dir.dx.toDouble(), dir.dy.toDouble());
+
+    // Head center
+    final headPt = points.last;
+    final headCenter = Offset(
+      (headPt.col + 0.5) * cellSize,
+      (headPt.row + 0.5) * cellSize,
+    );
+
+    // Arrowhead geometry:
+    // Length = 0.55 * cellSize, base width = 0.50 * cellSize
+    // Tip at headCenter + 0.35 * cellSize * dirVec
+    // Base center at headCenter - 0.20 * cellSize * dirVec
+    final headTip = headCenter + dirVec * (cellSize * 0.35);
+    final headBaseCenter = headCenter - dirVec * (cellSize * 0.20);
+    final perpVec = Offset(-dirVec.dy, dirVec.dx);
+    final halfBaseWidth = cellSize * 0.25;
+    final headLeftBase = headBaseCenter + perpVec * halfBaseWidth;
+    final headRightBase = headBaseCenter - perpVec * halfBaseWidth;
+
+    // 1. Build smooth polyline path starting from tailCenter and ending exactly at headBaseCenter
+    final polyPath = _buildPolylinePath(points, cellSize, headBaseCenter);
+
+    // Optional Hint / Selection Glow
+    if (isHinted || isSelected) {
+      final glowColor = isSelected ? const Color(0x661E88FF) : const Color(0x55F59E0B);
       final glowPaint = Paint()
-        ..color = const Color(0x55F59E0B)
+        ..color = glowColor
         ..strokeWidth = strokeWidth * 2.8
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round
         ..style = PaintingStyle.stroke;
-      _paintPolyline(canvas, points, cellSize, glowPaint, roundHead: false);
+      canvas.drawPath(polyPath, glowPaint);
     }
 
+    // 2. Draw line: StrokeCap.butt at headBaseCenter prevents any blob or overlap into triangle
     final bodyPaint = Paint()
       ..color = strokeColor
       ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.butt // Butt cap at head prevents any blob/protrusion
-      ..strokeJoin = StrokeJoin.round // Smooth round joins at bends
+      ..strokeCap = StrokeCap.butt
+      ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
-    // Draw snake body polyline
-    _paintPolyline(canvas, points, cellSize, bodyPaint, roundHead: false);
+    canvas.drawPath(polyPath, bodyPaint);
 
-    // Draw clean round cap explicitly at the tail
+    // 3. Draw round cap at tail
     final tailPt = points.first;
-    final tailCenter = Offset((tailPt.col + 0.5) * cellSize, (tailPt.row + 0.5) * cellSize);
+    final tailCenter = Offset(
+      (tailPt.col + 0.5) * cellSize,
+      (tailPt.row + 0.5) * cellSize,
+    );
     final tailPaint = Paint()
       ..color = strokeColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(tailCenter, strokeWidth / 2, tailPaint);
 
-    // Draw crisp arrowhead at head
-    final head = arrow.head;
-    final hx = (head.col + 0.5) * cellSize;
-    final hy = (head.row + 0.5) * cellSize;
-    _paintArrowHead(canvas, Offset(hx, hy), arrow.direction, strokeColor, cellSize);
+    // 4. Draw clean solid triangle arrowhead: no notch, no outline
+    final headTriangle = Path()
+      ..moveTo(headTip.dx, headTip.dy)
+      ..lineTo(headLeftBase.dx, headLeftBase.dy)
+      ..lineTo(headRightBase.dx, headRightBase.dy)
+      ..close();
+
+    final headPaint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = true;
+
+    canvas.drawPath(headTriangle, headPaint);
+  }
+
+  Path _buildPolylinePath(List<GridPoint> points, double cellSize, Offset endPoint) {
+    final path = Path();
+    final firstPt = points.first;
+    final startCenter = Offset(
+      (firstPt.col + 0.5) * cellSize,
+      (firstPt.row + 0.5) * cellSize,
+    );
+    path.moveTo(startCenter.dx, startCenter.dy);
+
+    final cornerRadius = cellSize * 0.25;
+
+    for (int i = 1; i < points.length; i++) {
+      final curr = points[i];
+      final prev = points[i - 1];
+      final isLast = i == points.length - 1;
+
+      final currCenter = Offset(
+        (curr.col + 0.5) * cellSize,
+        (curr.row + 0.5) * cellSize,
+      );
+
+      final inDx = (curr.col - prev.col).toDouble();
+      final inDy = (curr.row - prev.row).toDouble();
+
+      if (isLast) {
+        // Line terminates exactly at base center of triangle
+        path.lineTo(endPoint.dx, endPoint.dy);
+      } else {
+        final next = points[i + 1];
+        final outDx = (next.col - curr.col).toDouble();
+        final outDy = (next.row - curr.row).toDouble();
+
+        if (inDx == outDx && inDy == outDy) {
+          // Straight continuation: draw straight through cell center
+          path.lineTo(currCenter.dx, currCenter.dy);
+        } else {
+          // 90-degree turn: round the bend smoothly with quadratic bezier
+          final inVec = Offset(inDx, inDy);
+          final outVec = Offset(outDx, outDy);
+
+          final cornerStart = currCenter - inVec * cornerRadius;
+          final cornerEnd = currCenter + outVec * cornerRadius;
+
+          path.lineTo(cornerStart.dx, cornerStart.dy);
+          path.quadraticBezierTo(
+            currCenter.dx,
+            currCenter.dy,
+            cornerEnd.dx,
+            cornerEnd.dy,
+          );
+        }
+      }
+    }
+
+    return path;
   }
 
   void _drawSlitheringSnake({
@@ -212,17 +452,19 @@ class ArrowPainter extends CustomPainter {
     required double strokeWidth,
     required Color strokeColor,
   }) {
-    final exitCells = boardSize + 2;
+    final exitCells = AnimationConfig.distanceToBoardEdgeCells(arrow, boardSize) + 1;
+    final dir = arrow.direction;
+    final dirVec = Offset(dir.dx.toDouble(), dir.dy.toDouble());
+
+    // Build center trajectory from tail to head, then exiting forward
     final trajectory = <Offset>[];
     for (final pt in points) {
       trajectory.add(Offset((pt.col + 0.5) * cellSize, (pt.row + 0.5) * cellSize));
     }
 
     final last = trajectory.last;
-    final dx = arrow.direction.dx * cellSize;
-    final dy = arrow.direction.dy * cellSize;
     for (int i = 1; i <= exitCells; i++) {
-      trajectory.add(Offset(last.dx + i * dx, last.dy + i * dy));
+      trajectory.add(last + dirVec * (i * cellSize));
     }
 
     final bodySegCount = points.length - 1;
@@ -234,34 +476,64 @@ class ArrowPainter extends CustomPainter {
 
     if (sTail >= totalDistance) return;
 
-    final activePoints = _sampleSubPolyline(trajectory, sTail, sHead);
-    if (activePoints.length < 2) return;
+    final fadeStart = 1.0 - AnimationConfig.fadeFraction;
+    final opacity = progress <= fadeStart
+        ? 1.0
+        : ((1.0 - progress) / AnimationConfig.fadeFraction).clamp(0.0, 1.0);
+    if (opacity <= 0.001) return;
 
-    final opacity = (1.0 - progress * 0.75).clamp(0.0, 1.0);
+    // Sample body up to headBaseCenter (0.20 cells behind head center) so line stays flush with triangle base
+    final sBodyEnd = math.max(sTail, sHead - 0.20);
+    final bodyPoints = _sampleSubPolyline(trajectory, sTail, sBodyEnd);
 
-    final bodyPaint = Paint()
-      ..color = strokeColor.withOpacity(opacity)
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.butt
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
+    if (bodyPoints.length >= 2) {
+      final bodyPaint = Paint()
+        ..color = strokeColor.withOpacity(opacity)
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.butt
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
 
-    final path = Path();
-    path.moveTo(activePoints.first.dx, activePoints.first.dy);
-    for (int i = 1; i < activePoints.length; i++) {
-      path.lineTo(activePoints[i].dx, activePoints[i].dy);
+      final path = Path();
+      path.moveTo(bodyPoints.first.dx, bodyPoints.first.dy);
+      for (int i = 1; i < bodyPoints.length; i++) {
+        path.lineTo(bodyPoints[i].dx, bodyPoints[i].dy);
+      }
+      canvas.drawPath(path, bodyPaint);
+
+      // Draw moving tail round cap
+      final tailPaint = Paint()
+        ..color = strokeColor.withOpacity(opacity)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(bodyPoints.first, strokeWidth / 2, tailPaint);
     }
-    canvas.drawPath(path, bodyPaint);
 
-    // Draw round cap at moving tail
-    final tailPaint = Paint()
-      ..color = strokeColor.withOpacity(opacity)
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(activePoints.first, strokeWidth / 2, tailPaint);
+    // Draw moving arrowhead at sHead
+    final headPoints = _sampleSubPolyline(trajectory, math.max(0.0, sHead - 0.25), sHead);
+    if (headPoints.length >= 2) {
+      final movingHead = headPoints.last;
+      final headDelta = movingHead - headPoints[headPoints.length - 2];
+      final headDir = headDelta.distance > 0.001 ? headDelta / headDelta.distance : dirVec;
 
-    // Draw arrowhead at moving head
-    if (sHead < totalDistance) {
-      _paintArrowHead(canvas, activePoints.last, arrow.direction, strokeColor.withOpacity(opacity), cellSize);
+      final headTip = movingHead + headDir * (cellSize * 0.35);
+      final headBaseCenter = movingHead - headDir * (cellSize * 0.20);
+      final perpVec = Offset(-headDir.dy, headDir.dx);
+      final halfBaseWidth = cellSize * 0.25;
+      final headLeftBase = headBaseCenter + perpVec * halfBaseWidth;
+      final headRightBase = headBaseCenter - perpVec * halfBaseWidth;
+
+      final headTriangle = Path()
+        ..moveTo(headTip.dx, headTip.dy)
+        ..lineTo(headLeftBase.dx, headLeftBase.dy)
+        ..lineTo(headRightBase.dx, headRightBase.dy)
+        ..close();
+
+      final headPaint = Paint()
+        ..color = strokeColor.withOpacity(opacity)
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true;
+
+      canvas.drawPath(headTriangle, headPaint);
     }
   }
 
@@ -289,65 +561,20 @@ class ArrowPainter extends CustomPainter {
     return result;
   }
 
-  void _paintPolyline(
-    Canvas canvas,
-    List<GridPoint> points,
-    double cellSize,
-    Paint paint, {
-    required bool roundHead,
-  }) {
-    if (points.length == 1) {
-      final p = points.first;
-      final c = Offset((p.col + 0.5) * cellSize, (p.row + 0.5) * cellSize);
-      canvas.drawCircle(c, paint.strokeWidth * 0.6, paint);
-      return;
-    }
-
-    final path = Path();
-    final first = points.first;
-    path.moveTo((first.col + 0.5) * cellSize, (first.row + 0.5) * cellSize);
-
-    for (int i = 1; i < points.length; i++) {
-      final pt = points[i];
-      path.lineTo((pt.col + 0.5) * cellSize, (pt.row + 0.5) * cellSize);
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  /// Draws a clean, crisp triangle arrowhead about 0.5 x cell size with no round-cap blobs.
-  void _paintArrowHead(
-    Canvas canvas,
-    Offset position,
-    ArrowDirection direction,
-    Color color,
-    double cellSize,
-  ) {
-    canvas.save();
-    canvas.translate(position.dx, position.dy);
-    canvas.rotate(direction.rotationAngle);
-
-    // Arrowhead size: about 0.5 x cell size
-    final headLen = cellSize * 0.48;
-    final halfWidth = cellSize * 0.22;
-
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill
-      ..isAntiAlias = true;
-
-    // Symmetrical crisp triangle: tip pointing in direction, base centered at cell center
-    final path = Path()
-      ..moveTo(0, -headLen * 0.55) // Tip pointing forward
-      ..lineTo(-halfWidth, headLen * 0.45) // Left base
-      ..lineTo(0, headLen * 0.15) // Slight modern inward notch
-      ..lineTo(halfWidth, headLen * 0.45) // Right base
-      ..close();
-
-    canvas.drawPath(path, fillPaint);
-    canvas.restore();
-  }
-
   @override
-  bool shouldRepaint(covariant ArrowPainter oldDelegate) => true;
+  bool shouldRepaint(covariant ArrowPainter oldDelegate) {
+    if (layerMode == ArrowLayerMode.staticOnly) {
+      return oldDelegate.board != board ||
+          oldDelegate.activeHintId != activeHintId ||
+          oldDelegate.isEyeComfortTheme != isEyeComfortTheme ||
+          oldDelegate.showHitAreas != showHitAreas ||
+          oldDelegate.staticRevision != staticRevision;
+    }
+    return oldDelegate.board != board ||
+        oldDelegate.activeHintId != activeHintId ||
+        oldDelegate.isEyeComfortTheme != isEyeComfortTheme ||
+        oldDelegate.showHitAreas != showHitAreas ||
+        oldDelegate.selectedArrowId != selectedArrowId ||
+        oldDelegate.activeBlockedId != activeBlockedId;
+  }
 }

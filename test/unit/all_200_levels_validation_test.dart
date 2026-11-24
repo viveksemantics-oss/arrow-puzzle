@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:arrow_escape/features/gameplay/models/level_model.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/features/gameplay/models/level_model.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   group('200 Winding Levels Automated Verification Test', () {

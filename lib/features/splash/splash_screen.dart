@@ -96,7 +96,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 ),
                 const SizedBox(height: 24),
                 const Text(
-                  'Arrow Maze',
+                  "Eklavya's Aim",
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,

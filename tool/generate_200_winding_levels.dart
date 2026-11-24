@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'package:arrow_escape/features/gameplay/engine/arrow_direction.dart';
-import 'package:arrow_escape/features/gameplay/engine/arrow_model.dart';
-import 'package:arrow_escape/features/gameplay/engine/puzzle_board.dart';
-import 'package:arrow_escape/features/gameplay/models/level_model.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_direction.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_model.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/puzzle_board.dart';
+import 'package:eklavyas_aim/features/gameplay/models/level_model.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   stdout.writeln('=== Generating 200 Winding Labyrinth Arrow Levels ===');

@@ -120,6 +120,22 @@ class PuzzleBoard {
     return ray;
   }
 
+  /// Returns the full straight exit ray of cells starting right in front of the head to board edge.
+  List<GridPoint> getExitRay(ArrowModel arrow) {
+    final ray = <GridPoint>[];
+    final head = arrow.head;
+    int r = head.row + arrow.direction.dy;
+    int c = head.col + arrow.direction.dx;
+
+    while (r >= 0 && r < size && c >= 0 && c < size) {
+      ray.add(GridPoint(r, c));
+      r += arrow.direction.dy;
+      c += arrow.direction.dx;
+    }
+
+    return ray;
+  }
+
   /// Returns all currently active arrows whose paths are completely clear.
   List<ArrowModel> getClearArrows() {
     return arrows.values

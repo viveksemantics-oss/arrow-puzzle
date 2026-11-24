@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:arrow_escape/core/services/admob_service.dart';
-import 'package:arrow_escape/core/services/purchase_service.dart';
-import 'package:arrow_escape/core/storage/storage_service.dart';
-import 'package:arrow_escape/core/utils/sound_manager.dart';
-import 'package:arrow_escape/features/gameplay/engine/level_repository.dart';
-import 'package:arrow_escape/features/gameplay/engine/move_result.dart';
-import 'package:arrow_escape/features/gameplay/providers/game_providers.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/core/services/admob_service.dart';
+import 'package:eklavyas_aim/core/services/purchase_service.dart';
+import 'package:eklavyas_aim/core/storage/storage_service.dart';
+import 'package:eklavyas_aim/core/utils/sound_manager.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/level_repository.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/move_result.dart';
+import 'package:eklavyas_aim/features/gameplay/providers/game_providers.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

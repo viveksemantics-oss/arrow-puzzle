@@ -34,7 +34,18 @@ class StorageService {
 
   // --- Progression ---
 
-  int get currentLevel => _prefs.getInt(_keyCurrentLevel) ?? 1;
+  int get currentLevel {
+    final saved = _prefs.getInt(_keyCurrentLevel);
+    if (saved != null && saved > 0) return saved;
+    final comp = completedLevels;
+    if (comp.isEmpty) return 1;
+    int maxComp = 0;
+    for (final l in comp) {
+      if (l > maxComp) maxComp = l;
+    }
+    return maxComp + 1;
+  }
+
   Future<void> setCurrentLevel(int level) => _prefs.setInt(_keyCurrentLevel, level);
 
   Set<int> get unlockedLevels {
@@ -78,8 +89,9 @@ class StorageService {
       );
     }
 
-    // Auto unlock next level
+    // Auto unlock next level and save current progression level
     await unlockLevel(level + 1);
+    await setCurrentLevel(level + 1);
     await incrementTotalCompleted();
   }
 

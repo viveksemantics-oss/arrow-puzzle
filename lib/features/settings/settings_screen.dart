@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../services/sound_service.dart';
 import '../gameplay/providers/game_providers.dart';
 
 /// Settings Screen providing audio controls, reset options, and policy links.
@@ -24,12 +27,13 @@ class SettingsScreen extends ConsumerWidget {
           children: [
             // Audio & Feedback Section
             _sectionHeader('AUDIO & HAPTICS'),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
+            Material(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                side: const BorderSide(color: AppColors.border),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   SwitchListTile.adaptive(
@@ -60,12 +64,13 @@ class SettingsScreen extends ConsumerWidget {
 
             // Appearance & Theme Section
             _sectionHeader('APPEARANCE & THEME'),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
+            Material(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                side: const BorderSide(color: AppColors.border),
               ),
+              clipBehavior: Clip.antiAlias,
               child: SwitchListTile.adaptive(
                 title: const Text('Eye Comfort Paper Theme', style: TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: const Text('Warm cream paper background with espresso ink'),
@@ -82,12 +87,13 @@ class SettingsScreen extends ConsumerWidget {
 
             // Store & Upgrades Section
             _sectionHeader('PREMIUM UPGRADES'),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
+            Material(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                side: const BorderSide(color: AppColors.border),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   ListTile(
@@ -98,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                         ? const Icon(Icons.check_circle_rounded, color: AppColors.success)
                         : TextButton(
                             onPressed: () async {
-                              final success = await purchase.buyProduct('com.arrowescape.remove_ads');
+                              final success = await purchase.buyProduct(AppConstants.iapRemoveAds);
                               if (!success) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('Store billing pending platform configuration.')),
@@ -126,12 +132,13 @@ class SettingsScreen extends ConsumerWidget {
 
             // Legal & Data Section
             _sectionHeader('ABOUT & PRIVACY'),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.surface,
+            Material(
+              color: AppColors.surface,
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
+                side: const BorderSide(color: AppColors.border),
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   ListTile(
@@ -143,10 +150,52 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
                   ListTile(
                     leading: const Icon(Icons.info_outline_rounded, color: AppColors.textPrimary),
-                    title: const Text('About Arrow Maze', style: TextStyle(fontWeight: FontWeight.w600)),
+                    title: const Text("About Eklavya's Aim", style: TextStyle(fontWeight: FontWeight.w600)),
                     subtitle: const Text('v1.0.0 (Build 1)'),
                   ),
                   const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
+                    if (kDebugMode) ...[
+                    SwitchListTile(
+                      secondary: const Icon(Icons.bug_report_outlined, color: AppColors.accent),
+                      title: const Text('Show hit areas', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Debug overlay: 0.30x cell tolerance'),
+                      value: ref.watch(debugShowHitAreasProvider),
+                      activeColor: AppColors.accent,
+                      onChanged: (val) => ref.read(debugShowHitAreasProvider.notifier).toggle(val),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Test sounds (Debug)',
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: SoundType.values.map((s) {
+                              return ActionChip(
+                                label: Text(s.name),
+                                onPressed: () async {
+                                  final err = await SoundService().testPlay(s);
+                                  if (err != null && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Sound "${s.name}" failed: $err')),
+                                    );
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16, color: AppColors.border),
+                  ],
                   ListTile(
                     leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
                     title: const Text('Reset All Progress', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.error)),

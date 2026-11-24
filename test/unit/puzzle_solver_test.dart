@@ -1,20 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:arrow_escape/features/gameplay/engine/arrow_direction.dart';
-import 'package:arrow_escape/features/gameplay/engine/arrow_model.dart';
-import 'package:arrow_escape/features/gameplay/engine/puzzle_board.dart';
-import 'package:arrow_escape/features/gameplay/solver/level_generator.dart';
-import 'package:arrow_escape/features/gameplay/solver/puzzle_solver.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_direction.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/arrow_model.dart';
+import 'package:eklavyas_aim/features/gameplay/engine/puzzle_board.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/level_generator.dart';
+import 'package:eklavyas_aim/features/gameplay/solver/puzzle_solver.dart';
 
 void main() {
   group('PuzzleSolver Tests', () {
     test('Identifies solvable puzzle and returns correct sequence', () {
-      final a1 = const ArrowModel(
+      final a1 = ArrowModel(
         id: 'a1',
         row: 0,
         col: 0,
         direction: ArrowDirection.right,
       );
-      final a2 = const ArrowModel(
+      final a2 = ArrowModel(
         id: 'a2',
         row: 0,
         col: 2,
@@ -35,10 +35,10 @@ void main() {
       // (1, 1) -> LEFT into (1, 0)
       // (1, 0) -> UP into (0, 0)
       final circle = [
-        const ArrowModel(id: 'c1', row: 0, col: 0, direction: ArrowDirection.right),
-        const ArrowModel(id: 'c2', row: 0, col: 1, direction: ArrowDirection.down),
-        const ArrowModel(id: 'c3', row: 1, col: 1, direction: ArrowDirection.left),
-        const ArrowModel(id: 'c4', row: 1, col: 0, direction: ArrowDirection.up),
+        ArrowModel(id: 'c1', row: 0, col: 0, direction: ArrowDirection.right),
+        ArrowModel(id: 'c2', row: 0, col: 1, direction: ArrowDirection.down),
+        ArrowModel(id: 'c3', row: 1, col: 1, direction: ArrowDirection.left),
+        ArrowModel(id: 'c4', row: 1, col: 0, direction: ArrowDirection.up),
       ];
       final board = PuzzleBoard.fromList(size: 2, arrowsList: circle);
 

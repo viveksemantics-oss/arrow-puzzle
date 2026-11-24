@@ -45,20 +45,33 @@ enum SilhouetteShape {
   }
 
   /// Picks a silhouette shape deterministically based on level number.
+  /// Early levels (1-25) are full square mazes as specified; later levels are silhouettes.
   static SilhouetteShape forLevel(int levelNumber) {
-    if (levelNumber <= 10) {
+    if (levelNumber <= 25) {
       return SilhouetteShape.square;
     }
     // Specific iconic levels matching game design references
-    if (levelNumber == 11) return SilhouetteShape.trophy;
-    if (levelNumber == 24) return SilhouetteShape.square; // Reference level 24 is square maze
     if (levelNumber == 27) return SilhouetteShape.anchor;
-    if (levelNumber == 40) return SilhouetteShape.dog;
+    if (levelNumber == 40) return SilhouetteShape.trophy;
     if (levelNumber == 99 || levelNumber == 100) return SilhouetteShape.dog;
     if (levelNumber == 199 || levelNumber == 200) return SilhouetteShape.square;
     if (levelNumber == 300) return SilhouetteShape.trophy;
 
-    // Cycle through rich silhouettes deterministically
+    // For early levels (26-40), use compact silhouettes without thin 1-cell spikes
+    if (levelNumber <= 40) {
+      const easyShapes = [
+        SilhouetteShape.trophy,
+        SilhouetteShape.anchor,
+        SilhouetteShape.knight,
+        SilhouetteShape.heart,
+        SilhouetteShape.house,
+        SilhouetteShape.circle,
+        SilhouetteShape.square,
+      ];
+      return easyShapes[(levelNumber * 7) % easyShapes.length];
+    }
+
+    // Cycle through rich silhouettes deterministically for Medium, Hard, Expert
     const shapes = [
       SilhouetteShape.trophy,
       SilhouetteShape.anchor,
@@ -147,7 +160,7 @@ class LevelMask {
       }
     }
 
-    // Safety fallback: if too few cells, fill center
+    // Ensure solid silhouette density: if sparse, dilate to thicken corridors
     int cellCount = 0;
     for (final row in mask) {
       for (final cell in row) {
@@ -155,11 +168,27 @@ class LevelMask {
       }
     }
 
-    if (cellCount < size * size * 0.25) {
-      return generate(SilhouetteShape.square, size);
+    if (cellCount < size * size * 0.45) {
+      final dilated = _dilate(mask, size);
+      return dilated;
     }
 
     return mask;
+  }
+
+  static List<List<bool>> _dilate(List<List<bool>> mask, int size) {
+    final result = List.generate(size, (r) => List<bool>.from(mask[r]));
+    for (int r = 1; r < size - 1; r++) {
+      for (int c = 1; c < size - 1; c++) {
+        if (mask[r][c]) {
+          result[r - 1][c] = true;
+          result[r + 1][c] = true;
+          result[r][c - 1] = true;
+          result[r][c + 1] = true;
+        }
+      }
+    }
+    return result;
   }
 
   static bool _isRawPointInside(SilhouetteShape shape, double u, double v) {
@@ -176,8 +205,8 @@ class LevelMask {
         return (u - 0.5).abs() + (v - 0.5).abs() <= 0.45;
 
       case SilhouetteShape.heart:
-        final x = (u - 0.5) * 2.3;
-        final y = -(v - 0.52) * 2.3;
+        final x = (u - 0.5) * 1.85;
+        final y = -(v - 0.50) * 1.85;
         final f = (x * x + y * y - 1);
         return (f * f * f - x * x * y * y * y) <= 0.0;
 
@@ -248,10 +277,10 @@ class LevelMask {
         return r <= starRadius;
 
       case SilhouetteShape.tree:
-        if (v >= 0.76 && v <= 0.94 && (u - 0.5).abs() <= 0.08) return true; // Trunk
-        if (v >= 0.10 && v <= 0.35 && (u - 0.5).abs() <= (v - 0.10) * 1.0) return true;
-        if (v >= 0.30 && v <= 0.55 && (u - 0.5).abs() <= (v - 0.22) * 1.1) return true;
-        if (v >= 0.50 && v <= 0.78 && (u - 0.5).abs() <= (v - 0.36) * 1.2) return true;
+        if (v >= 0.74 && v <= 0.94 && (u - 0.5).abs() <= 0.15) return true; // Trunk
+        if (v >= 0.10 && v <= 0.38 && (u - 0.5).abs() <= 0.12 + (v - 0.10) * 0.9) return true;
+        if (v >= 0.32 && v <= 0.60 && (u - 0.5).abs() <= 0.18 + (v - 0.25) * 1.0) return true;
+        if (v >= 0.52 && v <= 0.78 && (u - 0.5).abs() <= 0.24 + (v - 0.40) * 1.1) return true;
         return false;
 
       case SilhouetteShape.house:

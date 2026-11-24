@@ -1,7 +1,7 @@
 import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 
-/// Intelligent solver for the Arrow Escape puzzle.
+/// Intelligent solver for the Eklavya's Aim puzzle.
 class PuzzleSolver {
   /// Returns all currently available unblocked arrows.
   static List<ArrowModel> findAvailableArrows(PuzzleBoard board) {

@@ -1,5 +1,6 @@
-package com.arrowescape.arrow_escape
+package com.eklavya.aim
 
 import io.flutter.embedding.android.FlutterActivity
 
 class MainActivity : FlutterActivity()
+

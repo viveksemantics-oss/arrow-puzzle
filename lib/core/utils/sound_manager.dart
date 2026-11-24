@@ -1,14 +1,17 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import '../../services/sound_service.dart';
 
-/// Sound and Haptic feedback manager for Arrow Escape.
+/// Sound and Haptic feedback manager for Eklavya's Aim.
 class SoundManager {
   static final SoundManager _instance = SoundManager._internal();
   factory SoundManager() => _instance;
   SoundManager._internal();
 
-  AudioPlayer? _player;
-  bool soundEnabled = true;
+  final SoundService _soundService = SoundService();
+
+  bool get soundEnabled => _soundService.soundEnabled;
+  set soundEnabled(bool value) => _soundService.setSoundEnabled(value);
+
   bool musicEnabled = true;
   bool hapticsEnabled = true;
 
@@ -17,32 +20,26 @@ class SoundManager {
     required bool music,
     required bool haptics,
   }) async {
-    soundEnabled = sound;
     musicEnabled = music;
     hapticsEnabled = haptics;
-    try {
-      _player = AudioPlayer();
-    } catch (_) {
-      // Headless / unsupported audio fallback
-    }
+    await _soundService.init(soundEnabled: sound);
   }
 
-  /// Arrow tap sound
+  /// Arrow tap + slide sound for a free arrow
   void playTap() {
     if (hapticsEnabled) {
       HapticFeedback.selectionClick();
     }
-    if (!soundEnabled) return;
-    SystemSound.play(SystemSoundType.click);
+    _soundService.play(SoundType.tap);
   }
 
-  /// Successful arrow exit sound
+  /// Free arrow slide-out sound (plays tap + slide)
   void playExit() {
     if (hapticsEnabled) {
       HapticFeedback.lightImpact();
     }
-    if (!soundEnabled) return;
-    SystemSound.play(SystemSoundType.click);
+    _soundService.play(SoundType.tap);
+    _soundService.play(SoundType.slide);
   }
 
   /// Blocked move error shake sound
@@ -50,8 +47,7 @@ class SoundManager {
     if (hapticsEnabled) {
       HapticFeedback.mediumImpact();
     }
-    if (!soundEnabled) return;
-    SystemSound.play(SystemSoundType.alert);
+    _soundService.play(SoundType.error);
   }
 
   /// Level victory sound
@@ -59,8 +55,23 @@ class SoundManager {
     if (hapticsEnabled) {
       HapticFeedback.heavyImpact();
     }
-    if (!soundEnabled) return;
-    SystemSound.play(SystemSoundType.click);
+    _soundService.play(SoundType.win);
+  }
+
+  /// Level failed / Game Over sound
+  void playLose() {
+    if (hapticsEnabled) {
+      HapticFeedback.heavyImpact();
+    }
+    _soundService.play(SoundType.lose);
+  }
+
+  /// Hint activated sound
+  void playHint() {
+    if (hapticsEnabled) {
+      HapticFeedback.selectionClick();
+    }
+    _soundService.play(SoundType.hint);
   }
 
   /// Generic UI button click
@@ -68,11 +79,10 @@ class SoundManager {
     if (hapticsEnabled) {
       HapticFeedback.selectionClick();
     }
-    if (!soundEnabled) return;
-    SystemSound.play(SystemSoundType.click);
+    _soundService.play(SoundType.button);
   }
 
   void dispose() {
-    _player?.dispose();
+    _soundService.dispose();
   }
 }

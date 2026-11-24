@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String appName = 'Arrow Maze';
+  static const String appName = "Eklavya's Aim";
   static const String appVersion = '1.0.0';
   static const String buildNumber = '1';
 
@@ -21,7 +21,7 @@ class AppConstants {
   static const String iosRewardedAdUnitId = 'ca-app-pub-3940256099942544/1712485313';
 
   // In-App Purchase Product IDs
-  static const String iapRemoveAds = 'com.arrowescape.remove_ads';
-  static const String iapUnlimitedHints = 'com.arrowescape.unlimited_hints';
+  static const String iapRemoveAds = 'com.eklavya.aim.remove_ads';
+  static const String iapUnlimitedHints = 'com.eklavya.aim.unlimited_hints';
   static const String iapPremiumPass = 'com.arrowescape.premium_pass';
 }

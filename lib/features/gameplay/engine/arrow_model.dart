@@ -29,42 +29,58 @@ class GridPoint {
 
 /// Represents an arrow element situated on the puzzle board.
 ///
-/// Supports multi-segment winding arrows (polylines) with bends (L, U, Z, Spiral)
-/// as well as single-cell arrows.
+/// Every arrow is a 4-connected polyline with at least 2 cells.
+/// The HEAD is the LAST cell of the path (points.last).
+/// Its exit direction is derived strictly from the last step (points[n-2] -> points[n-1]).
 class ArrowModel {
   final String id;
-  final int row; // Head row (for backward compatibility)
-  final int col; // Head col (for backward compatibility)
-  final ArrowDirection direction; // Head direction
-  final List<GridPoint> points; // Ordered sequence of cells from tail to head
+  final List<GridPoint> points; // Ordered sequence of cells from tail (points.first) to head (points.last)
   final bool isActive;
   final double exitProgress; // 0.0 = on board, 1.0 = exited off screen
   final bool isShaking; // true when blocked tap animation triggers
   final bool isHighlighted; // true when hint is active
 
-  const ArrowModel({
+  ArrowModel({
     required this.id,
-    required this.row,
-    required this.col,
-    required this.direction,
-    this.points = const [],
+    List<GridPoint>? points,
+    int? row,
+    int? col,
+    ArrowDirection? direction,
     this.isActive = true,
     this.exitProgress = 0.0,
     this.isShaking = false,
     this.isHighlighted = false,
-  });
-
-  /// All grid points occupied by this arrow (from tail to head).
-  List<GridPoint> get allPoints {
-    if (points.isNotEmpty) return points;
-    return [GridPoint(row, col)];
+  }) : points = List<GridPoint>.unmodifiable(
+          points ?? _makeStraightPoints(row ?? 0, col ?? 0, direction ?? ArrowDirection.up),
+        ) {
+    assert(this.points.length >= 2,
+        'Arrow $id must have at least 2 cells, got ${this.points.length}');
+    for (int i = 0; i < this.points.length - 1; i++) {
+      final dr = (this.points[i + 1].row - this.points[i].row).abs();
+      final dc = (this.points[i + 1].col - this.points[i].col).abs();
+      assert(
+        (dr == 1 && dc == 0) || (dr == 0 && dc == 1),
+        'Consecutive cells must be 4-neighbors (differ by 1 in row OR col, never both): ${this.points[i]} -> ${this.points[i + 1]} in arrow $id',
+      );
+    }
   }
 
-  /// Head position where the arrowhead points outward.
-  GridPoint get head => allPoints.last;
+  static List<GridPoint> _makeStraightPoints(
+      int row, int col, ArrowDirection direction) {
+    return [
+      GridPoint(row - direction.dy, col - direction.dx),
+      GridPoint(row, col)
+    ];
+  }
 
-  /// Tail position where the arrow originates.
-  GridPoint get tail => allPoints.first;
+  /// All grid points occupied by this arrow (from tail to head).
+  List<GridPoint> get allPoints => points;
+
+  /// Head position where the arrowhead points outward (index n-1).
+  GridPoint get head => points.last;
+
+  /// Tail position where the arrow originates (index 0).
+  GridPoint get tail => points.first;
 
   /// Head row coordinate.
   int get headRow => head.row;
@@ -72,24 +88,33 @@ class ArrowModel {
   /// Head col coordinate.
   int get headCol => head.col;
 
+  int get row => head.row;
+  int get col => head.col;
+
   GridPoint get position => head;
+
+  /// Exit direction: derived strictly from the last step (from cell n-2 to cell n-1).
+  /// Line and arrowhead can never disagree.
+  ArrowDirection get direction {
+    final prev = points[points.length - 2];
+    final last = points.last;
+    return ArrowDirection.fromDelta(last.row - prev.row, last.col - prev.col);
+  }
 
   ArrowModel copyWith({
     String? id,
-    int? row,
-    int? col,
-    ArrowDirection? direction,
     List<GridPoint>? points,
     bool? isActive,
     double? exitProgress,
     bool? isShaking,
     bool? isHighlighted,
+    // Backwards compatibility params for any callers:
+    int? row,
+    int? col,
+    ArrowDirection? direction,
   }) {
     return ArrowModel(
       id: id ?? this.id,
-      row: row ?? this.row,
-      col: col ?? this.col,
-      direction: direction ?? this.direction,
       points: points ?? this.points,
       isActive: isActive ?? this.isActive,
       exitProgress: exitProgress ?? this.exitProgress,
@@ -100,37 +125,35 @@ class ArrowModel {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'row': row,
-        'col': col,
-        'direction': direction.name,
         'points': points.map((p) => p.toJson()).toList(),
         'isActive': isActive,
       };
 
   factory ArrowModel.fromJson(Map<String, dynamic> json) {
     final pointsJson = json['points'] as List<dynamic>?;
-    final parsedPoints = pointsJson != null
-        ? pointsJson
-            .map((p) => GridPoint.fromJson(p as Map<String, dynamic>))
-            .toList()
-        : <GridPoint>[];
-
-    final r = json['row'] as int;
-    final c = json['col'] as int;
+    List<GridPoint> parsedPoints;
+    if (pointsJson != null && pointsJson.isNotEmpty) {
+      parsedPoints = pointsJson
+          .map((p) => GridPoint.fromJson(p as Map<String, dynamic>))
+          .toList();
+    } else {
+      final r = json['row'] as int? ?? 0;
+      final c = json['col'] as int? ?? 0;
+      final dirStr = json['direction'] as String? ?? 'up';
+      final dir = ArrowDirection.fromString(dirStr);
+      parsedPoints = [GridPoint(r - dir.dy, c - dir.dx), GridPoint(r, c)];
+    }
 
     return ArrowModel(
       id: json['id'] as String,
-      row: r,
-      col: c,
-      direction: ArrowDirection.fromString(json['direction'] as String),
-      points: parsedPoints.isNotEmpty ? parsedPoints : [GridPoint(r, c)],
+      points: parsedPoints,
       isActive: json['isActive'] as bool? ?? true,
     );
   }
 
   @override
   String toString() =>
-      'ArrowModel($id points:${allPoints.length} head:$head ${direction.symbol} active:$isActive)';
+      'ArrowModel($id len:${points.length} tail:$tail head:$head ${direction.symbol} active:$isActive)';
 
   @override
   bool operator ==(Object other) =>
@@ -138,16 +161,17 @@ class ArrowModel {
       other is ArrowModel &&
           runtimeType == other.runtimeType &&
           id == other.id &&
-          row == other.row &&
-          col == other.col &&
-          direction == other.direction &&
-          isActive == other.isActive;
+          isActive == other.isActive &&
+          _listEquals(points, other.points);
+
+  static bool _listEquals(List<GridPoint> a, List<GridPoint> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
-  int get hashCode =>
-      id.hashCode ^
-      row.hashCode ^
-      col.hashCode ^
-      direction.hashCode ^
-      isActive.hashCode;
+  int get hashCode => id.hashCode ^ isActive.hashCode ^ points.length.hashCode;
 }

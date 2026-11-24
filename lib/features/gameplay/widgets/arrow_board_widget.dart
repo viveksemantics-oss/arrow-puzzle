@@ -1,15 +1,19 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../game/animation_config.dart';
+import '../engine/arrow_hit_tester.dart';
 import '../engine/arrow_model.dart';
 import '../engine/puzzle_board.dart';
 import 'arrow_painter.dart';
 
-/// Interactive Puzzle Board Widget with card auto-fit, pinch-to-zoom, pan, and sub-cell polyline hit-testing.
+/// Interactive Puzzle Board Widget with card auto-fit, pinch-to-zoom, pan, and exact O(1) spatial hit-testing.
 class ArrowBoardWidget extends StatefulWidget {
   final PuzzleBoard board;
   final Function(String arrowId) onArrowTapped;
   final String? activeHintId;
   final bool isEyeComfortTheme;
+  final bool showHitAreas;
 
   const ArrowBoardWidget({
     super.key,
@@ -17,6 +21,7 @@ class ArrowBoardWidget extends StatefulWidget {
     required this.onArrowTapped,
     this.activeHintId,
     this.isEyeComfortTheme = false,
+    this.showHitAreas = false,
   });
 
   @override
@@ -26,7 +31,14 @@ class ArrowBoardWidget extends StatefulWidget {
 class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     with TickerProviderStateMixin {
   final TransformationController _transformationController = TransformationController();
+  final ValueNotifier<int> _repaintNotifier = ValueNotifier<int>(0);
+  late final ArrowHitTester _hitTester;
+  int _staticRevision = 0;
+  double _lastCellSize = 20.0;
 
+  final Map<int, Offset> _pointerDownPos = {};
+
+  final Map<String, ArrowModel> _exitingArrows = {};
   final Map<String, AnimationController> _exitControllers = {};
   final Map<String, double> _exitProgress = {};
 
@@ -35,10 +47,30 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
 
   String? _activeBlockedId;
   List<GridPoint>? _activeBlockedRay;
+  String? _selectedArrowId;
+  List<GridPoint>? _selectedRay;
+
+  @override
+  void initState() {
+    super.initState();
+    _hitTester = ArrowHitTester(widget.board);
+  }
+
+  @override
+  void didUpdateWidget(covariant ArrowBoardWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.board != widget.board) {
+      _hitTester.updateBoard(
+        widget.board,
+        excludedIds: _exitingArrows.keys.toSet(),
+      );
+    }
+  }
 
   @override
   void dispose() {
     _transformationController.dispose();
+    _repaintNotifier.dispose();
     for (final c in _exitControllers.values) {
       c.dispose();
     }
@@ -48,28 +80,51 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     super.dispose();
   }
 
-  /// Triggers a smooth slithering exit animation for the specified arrow.
+  /// Exposes TransformationController for testing zoom/pan hit-testing.
+  @visibleForTesting
+  TransformationController get transformationController => _transformationController;
+
+  /// Triggers a smooth, independent slithering exit animation for the specified arrow.
   void animateArrowExit(ArrowModel arrow, VoidCallback onFinished) {
+    if (_exitControllers.containsKey(arrow.id)) return;
+
+    // Immediately exclude from hit-testing and spatial index
+    _hitTester.excludeArrow(arrow.id);
+    _exitingArrows[arrow.id] = arrow;
+    _exitProgress[arrow.id] = 0.0;
+    if (mounted) {
+      setState(() {
+        _staticRevision++;
+      });
+    }
+
+    final durationMs = AnimationConfig.computeSlideDurationMs(arrow, widget.board.size);
     final controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 360),
+      duration: Duration(milliseconds: durationMs),
     );
 
-    final animation = CurvedAnimation(
-      parent: controller,
-      curve: Curves.easeInCubic,
-    );
-
-    animation.addListener(() {
-      setState(() {
-        _exitProgress[arrow.id] = animation.value;
-      });
+    controller.addListener(() {
+      _exitProgress[arrow.id] = AnimationConfig.easeInThenConstant(controller.value, durationMs);
+      _repaintNotifier.value++;
     });
 
-    animation.addStatusListener((status) {
+    controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         controller.dispose();
         _exitControllers.remove(arrow.id);
+        _exitingArrows.remove(arrow.id);
+        _exitProgress.remove(arrow.id);
+        if (_selectedArrowId == arrow.id) {
+          _selectedArrowId = null;
+          _selectedRay = null;
+        }
+        if (mounted) {
+          setState(() {
+            _staticRevision++;
+          });
+        }
+        _repaintNotifier.value++;
         onFinished();
       }
     });
@@ -78,44 +133,56 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     controller.forward();
   }
 
-  /// Triggers shake vibration, red flash on blocked arrow and blocking arrow.
+  /// Triggers shake vibration and visual red flash on blocked move.
   void animateArrowShake(ArrowModel arrow, String? blockingArrowId, List<GridPoint> blockedRay) {
-    setState(() {
-      _activeBlockedId = blockingArrowId;
-      _activeBlockedRay = blockedRay;
-    });
+    if (_shakeControllers.containsKey(arrow.id)) return;
 
-    Future.delayed(const Duration(milliseconds: 460), () {
-      if (mounted) {
+    _activeBlockedId = blockingArrowId;
+    _activeBlockedRay = blockedRay;
+    if (mounted) {
+      setState(() {
+        _staticRevision++;
+      });
+    }
+    _repaintNotifier.value++;
+
+    Future.delayed(const Duration(milliseconds: AnimationConfig.blockFlashDurationMs), () {
+      if (mounted && _activeBlockedId == blockingArrowId) {
+        _activeBlockedId = null;
+        _activeBlockedRay = null;
         setState(() {
-          _activeBlockedId = null;
-          _activeBlockedRay = null;
+          _staticRevision++;
         });
+        _repaintNotifier.value++;
       }
     });
 
     final controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 360),
+      duration: const Duration(milliseconds: AnimationConfig.shakeDurationMs),
     );
 
     controller.addListener(() {
       final t = controller.value;
-      final offset = math.sin(t * math.pi * 6) * (1.0 - t) * 8.5;
-      setState(() {
-        _shakeOffsets[arrow.id] = offset;
-      });
+      final amp = _lastCellSize * AnimationConfig.shakeOffsetCells;
+      final offset = math.sin(t * math.pi * 2 * AnimationConfig.shakeOscillations) *
+          (1.0 - Curves.easeOut.transform(t)) *
+          amp;
+      _shakeOffsets[arrow.id] = offset;
+      _repaintNotifier.value++;
     });
 
     controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         controller.dispose();
         _shakeControllers.remove(arrow.id);
+        _shakeOffsets.remove(arrow.id);
         if (mounted) {
           setState(() {
-            _shakeOffsets.remove(arrow.id);
+            _staticRevision++;
           });
         }
+        _repaintNotifier.value++;
       }
     });
 
@@ -123,12 +190,13 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     controller.forward();
   }
 
-  /// Clears ongoing animations.
+  /// Clears ongoing animations and resets spatial index.
   void resetAnimations() {
     for (final c in _exitControllers.values) {
       c.dispose();
     }
     _exitControllers.clear();
+    _exitingArrows.clear();
     _exitProgress.clear();
 
     for (final c in _shakeControllers.values) {
@@ -138,61 +206,51 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
     _shakeOffsets.clear();
     _activeBlockedId = null;
     _activeBlockedRay = null;
+    _selectedArrowId = null;
+    _selectedRay = null;
     _transformationController.value = Matrix4.identity();
-    if (mounted) setState(() {});
+    _hitTester.clearExcluded();
+    _repaintNotifier.value++;
   }
 
-  /// Handles touch event by performing distance hit-testing against arrow polyline segments.
-  void _handleTap(Offset localPosition, double cellSize) {
-    String? closestArrowId;
-    double minDistance = double.infinity;
-    // SPEC A: Use a hit tolerance of about 0.45 x cell size around the line (touch area generous)
-    final maxTouchDistance = cellSize * 0.45;
+  void _handlePointerUp(
+    PointerUpEvent event,
+    double cellSize,
+    Offset boardOriginInScene,
+  ) {
+    final downPos = _pointerDownPos.remove(event.pointer);
+    // Ignore if another finger is still down (pinch) or pointer dragged >= 8 px
+    if (downPos == null || _pointerDownPos.isNotEmpty) return;
+    if ((event.localPosition - downPos).distance >= 8.0) return;
 
-    for (final arrow in widget.board.arrows.values) {
-      if (!arrow.isActive) continue;
+    final boardPos = ArrowHitTester.viewportToBoard(
+      viewportPosition: event.localPosition,
+      controller: _transformationController,
+      boardOriginInScene: boardOriginInScene,
+    );
 
-      final points = arrow.allPoints;
-      if (points.length == 1) {
-        final cx = (points.first.col + 0.5) * cellSize;
-        final cy = (points.first.row + 0.5) * cellSize;
-        final d = (localPosition - Offset(cx, cy)).distance;
-        if (d < minDistance) {
-          minDistance = d;
-          closestArrowId = arrow.id;
-        }
-      } else {
-        for (int i = 0; i < points.length - 1; i++) {
-          final p1 = Offset(
-            (points[i].col + 0.5) * cellSize,
-            (points[i].row + 0.5) * cellSize,
-          );
-          final p2 = Offset(
-            (points[i + 1].col + 0.5) * cellSize,
-            (points[i + 1].row + 0.5) * cellSize,
-          );
+    final result = _hitTester.hitTest(boardPos: boardPos, cellSize: cellSize);
+    if (result == null) return;
 
-          final d = _distanceToSegment(localPosition, p1, p2);
-          if (d < minDistance) {
-            minDistance = d;
-            closestArrowId = arrow.id;
-          }
-        }
+    final tappedArrow = result.arrow;
+    if (kDebugMode && widget.showHitAreas) {
+      debugPrint('tap -> ${tappedArrow.id}, ${result.distance.toStringAsFixed(2)}');
+    }
+
+    _selectedArrowId = tappedArrow.id;
+    _selectedRay = widget.board.getExitRay(tappedArrow);
+    _repaintNotifier.value++;
+
+    widget.onArrowTapped(tappedArrow.id);
+
+    final targetId = tappedArrow.id;
+    Future.delayed(const Duration(milliseconds: 220), () {
+      if (mounted && _selectedArrowId == targetId) {
+        _selectedArrowId = null;
+        _selectedRay = null;
+        _repaintNotifier.value++;
       }
-    }
-
-    if (closestArrowId != null && minDistance <= maxTouchDistance) {
-      widget.onArrowTapped(closestArrowId);
-    }
-  }
-
-  double _distanceToSegment(Offset p, Offset v, Offset w) {
-    final l2 = (v - w).distanceSquared;
-    if (l2 == 0.0) return (p - v).distance;
-    final t = (((p.dx - v.dx) * (w.dx - v.dx) + (p.dy - v.dy) * (w.dy - v.dy)) / l2)
-        .clamp(0.0, 1.0);
-    final projection = Offset(v.dx + t * (w.dx - v.dx), v.dy + t * (w.dy - v.dy));
-    return (p - projection).distance;
+    });
   }
 
   @override
@@ -210,7 +268,7 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
         final availW = cardW - padding * 2;
         final availH = cardH - padding * 2;
 
-        // SPEC C: Compute cell size from the level's mask bounding box
+        // Compute cell size from the level's mask bounding box
         int minR = widget.board.size, maxR = 0, minC = widget.board.size, maxC = 0;
         for (final arrow in widget.board.arrows.values) {
           for (final pt in arrow.allPoints) {
@@ -230,12 +288,15 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
         final boundingCols = (maxC - minC + 1).toDouble();
         final boundingRows = (maxR - minR + 1).toDouble();
 
-        // Fit silhouette bounding box into available card space
         final cellSize = math.min(availW / boundingCols, availH / boundingRows) * 0.94;
+        _lastCellSize = cellSize;
         final boardTotalW = widget.board.size * cellSize;
         final boardTotalH = widget.board.size * cellSize;
+        final boardOriginInScene = Offset(
+          (availW - boardTotalW) / 2,
+          (availH - boardTotalH) / 2,
+        );
 
-        // SPEC C: Card = white, 24px rounded corners, soft shadow only (NO thick black border, NO hatched corners)
         return Container(
           width: cardW,
           height: cardH,
@@ -253,27 +314,63 @@ class ArrowBoardWidgetState extends State<ArrowBoardWidget>
           padding: const EdgeInsets.all(padding),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(18),
-            child: InteractiveViewer(
-              transformationController: _transformationController,
-              minScale: 0.6,
-              maxScale: 4.5,
-              boundaryMargin: const EdgeInsets.all(24.0),
-              clipBehavior: Clip.hardEdge,
-              child: Center(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapUp: (details) => _handleTap(details.localPosition, cellSize),
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      size: Size(boardTotalW, boardTotalH),
-                      painter: ArrowPainter(
-                        board: widget.board,
-                        exitProgress: _exitProgress,
-                        shakeOffsets: _shakeOffsets,
-                        activeHintId: widget.activeHintId,
-                        activeBlockedId: _activeBlockedId,
-                        blockedRay: _activeBlockedRay,
-                        isEyeComfortTheme: widget.isEyeComfortTheme,
+            child: Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: (e) => _pointerDownPos[e.pointer] = e.localPosition,
+              onPointerCancel: (e) => _pointerDownPos.remove(e.pointer),
+              onPointerUp: (e) => _handlePointerUp(e, cellSize, boardOriginInScene),
+              child: InteractiveViewer(
+                transformationController: _transformationController,
+                minScale: 0.6,
+                maxScale: 4.5,
+                boundaryMargin: const EdgeInsets.all(24.0),
+                clipBehavior: Clip.hardEdge,
+                child: SizedBox(
+                  width: availW,
+                  height: availH,
+                  child: Center(
+                    child: OverflowBox(
+                      minWidth: 0,
+                      maxWidth: double.infinity,
+                      minHeight: 0,
+                      maxHeight: double.infinity,
+                      child: Stack(
+                        children: [
+                          RepaintBoundary(
+                            child: CustomPaint(
+                              size: Size(boardTotalW, boardTotalH),
+                              painter: ArrowPainter(
+                                board: widget.board,
+                                exitingArrows: _exitingArrows,
+                                activeHintId: widget.activeHintId,
+                                activeBlockedId: _activeBlockedId,
+                                selectedArrowId: _selectedArrowId,
+                                isEyeComfortTheme: widget.isEyeComfortTheme,
+                                showHitAreas: widget.showHitAreas,
+                                layerMode: ArrowLayerMode.staticOnly,
+                                staticRevision: _staticRevision,
+                              ),
+                            ),
+                          ),
+                          CustomPaint(
+                            size: Size(boardTotalW, boardTotalH),
+                            painter: ArrowPainter(
+                              repaint: _repaintNotifier,
+                              board: widget.board,
+                              exitingArrows: _exitingArrows,
+                              exitProgress: _exitProgress,
+                              shakeOffsets: _shakeOffsets,
+                              activeHintId: widget.activeHintId,
+                              activeBlockedId: _activeBlockedId,
+                              blockedRay: _activeBlockedRay,
+                              selectedArrowId: _selectedArrowId,
+                              selectedRay: _selectedRay,
+                              isEyeComfortTheme: widget.isEyeComfortTheme,
+                              showHitAreas: widget.showHitAreas,
+                              layerMode: ArrowLayerMode.dynamicOnly,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

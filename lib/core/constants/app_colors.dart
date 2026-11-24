@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Minimalist, premium color palette for Arrow Escape.
+/// Minimalist, premium color palette for Eklavya's Aim.
 class AppColors {
   // Backgrounds
-  static const Color background = Color(0xFFF8F9FA);
+  static const Color background = Color(0xFFE8EEF5);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceVariant = Color(0xFFF1F3F5);
 

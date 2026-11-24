@@ -9,3 +9,4 @@
 -dontwarn com.google.android.gms.ads.**
 -keep class dev.flutter.pigeon.** { *; }
 -keep class com.arrowescape.** { *; }
+-keep class com.eklavya.aim.** { *; }

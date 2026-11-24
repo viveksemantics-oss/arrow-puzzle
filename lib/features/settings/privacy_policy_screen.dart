@@ -17,7 +17,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           children: const [
             Text(
-              'Privacy Policy for Arrow Escape',
+              "Privacy Policy for Eklavya's Aim",
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
@@ -35,7 +35,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
             SizedBox(height: 20),
             Text(
               '1. Overview\n'
-              'Arrow Escape is built as an offline-first puzzle game. We value your privacy and do not collect, sell, or monetize any personally identifiable information (PII).\n\n'
+              'Eklavya\'s Aim is built as an offline-first puzzle game. We value your privacy and do not collect, sell, or monetize any personally identifiable information (PII).\n\n'
               '2. Data Stored on Device\n'
               'Your game progression, completed levels, best completion times, statistics, and preferences (such as sound and haptics) are stored exclusively on your device using local storage (SharedPreferences). This data does not leave your device.\n\n'
               '3. Advertisements & Monetization\n'
@@ -43,9 +43,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
               '4. In-App Purchases\n'
               'Payments are processed directly by Apple App Store (StoreKit) or Google Play Billing. We never receive or store your payment details, credit card numbers, or billing addresses.\n\n'
               '5. Children\'s Privacy\n'
-              'Arrow Escape does not knowingly collect any personal information from children under the age of 13.\n\n'
+              'Eklavya\'s Aim does not knowingly collect any personal information from children under the age of 13.\n\n'
               '6. Contact Information\n'
-              'If you have any questions or concerns regarding this privacy policy, please contact our support team at support@arrowescape.com.',
+              'If you have any questions or concerns regarding this privacy policy, please contact our support team at support@eklavyasaim.com.',
               style: TextStyle(
                 fontSize: 14,
                 height: 1.6,

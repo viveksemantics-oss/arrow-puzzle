@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/game_providers.dart';
 import '../widgets/arrow_board_widget.dart';
+import '../widgets/banner_ad_widget.dart';
 import '../widgets/game_controls.dart';
 import '../widgets/game_header.dart';
 import '../widgets/game_over_dialog.dart';
@@ -9,7 +11,7 @@ import '../widgets/level_completed_dialog.dart';
 import '../widgets/pause_dialog.dart';
 import '../widgets/vector_heart.dart';
 
-/// Full interactive Gameplay Screen for Arrow Maze.
+/// Full interactive Gameplay Screen for Eklavya's Aim.
 ///
 /// Matches the exact UI layout from specifications:
 /// - Top Bar: Circular Pause button, Level title + Tier badge pill, Stopwatch Timer pill
@@ -58,11 +60,11 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
     final controller = ref.read(gameControllerProvider.notifier);
 
     if (state.board.isPathClear(arrow)) {
-      // 1. Play visual snake slithering exit animation
+      // 1. Immediately commit move to engine state & occupancy grid so rapid taps never see stale data
+      final result = controller.tapArrow(arrowId);
+      // 2. Play independent visual snake slithering exit animation
       _boardKey.currentState?.animateArrowExit(arrow, () {
-        // 2. Commit move to engine state after animation completes
-        final result = controller.tapArrow(arrowId);
-        if (result.isGameWon && !_dialogOpen) {
+        if (result.isGameWon && !_dialogOpen && mounted) {
           _showVictoryDialog();
         }
       });
@@ -103,20 +105,27 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
         seconds: state.elapsedSeconds,
         stars: stars,
         onNextLevel: () {
+          ref.read(soundProvider).playClick();
           Navigator.of(ctx).pop();
           _dialogOpen = false;
-          admob.showInterstitialIfEligible(storage, onDismissed: () {
-            ref.read(gameControllerProvider.notifier).loadLevel(state.level.levelNumber + 1);
-            _boardKey.currentState?.resetAnimations();
-          });
+          admob.showInterstitialIfEligible(
+            storage,
+            completedLevelNumber: state.level.levelNumber,
+            onDismissed: () {
+              ref.read(gameControllerProvider.notifier).loadLevel(state.level.levelNumber + 1);
+              _boardKey.currentState?.resetAnimations();
+            },
+          );
         },
         onReplay: () {
+          ref.read(soundProvider).playClick();
           Navigator.of(ctx).pop();
           _dialogOpen = false;
           ref.read(gameControllerProvider.notifier).restart();
           _boardKey.currentState?.resetAnimations();
         },
         onMenu: () {
+          ref.read(soundProvider).playClick();
           Navigator.of(ctx).pop();
           _dialogOpen = false;
           Navigator.of(context).pop();
@@ -127,6 +136,7 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
 
   void _showGameOverDialog() {
     _dialogOpen = true;
+    ref.read(soundProvider).playLose();
     final admob = ref.read(admobProvider);
     final controller = ref.read(gameControllerProvider.notifier);
 
@@ -137,8 +147,8 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
         onWatchAd: () {
           Navigator.of(ctx).pop();
           _dialogOpen = false;
-          admob.showRewardedForHints(
-            onRewardEarned: (amount) {
+          admob.showRewardedForExtraLife(
+            onLifeGranted: () {
               controller.addExtraLife();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('+1 Life Restored! Keep Playing!')),
@@ -164,14 +174,20 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
 
   void _showPauseDialog() {
     final storage = ref.read(storageProvider);
+    final controller = ref.read(gameControllerProvider.notifier);
+    controller.pause();
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => PauseDialog(
-        onResume: () => Navigator.of(ctx).pop(),
-        onRestart: () {
+        onResume: () {
+          controller.resume();
           Navigator.of(ctx).pop();
-          ref.read(gameControllerProvider.notifier).restart();
+        },
+        onRestart: () {
+          controller.resume();
+          Navigator.of(ctx).pop();
+          controller.restart();
           _boardKey.currentState?.resetAnimations();
         },
         onLevels: () {
@@ -198,7 +214,9 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
     final admob = ref.read(admobProvider);
 
     final success = controller.useHint();
-    if (!success && state.hintsRemaining <= 0) {
+    if (success) {
+      ref.read(soundProvider).playHint();
+    } else if (state.hintsRemaining <= 0) {
       // Offer rewarded video ad for hints
       showDialog(
         context: context,
@@ -241,6 +259,12 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
             _showVictoryDialog();
           }
         });
+      } else if (next.isGameOver && !(previous?.isGameOver ?? false) && !_dialogOpen) {
+        Future.delayed(const Duration(milliseconds: 380), () {
+          if (mounted && !_dialogOpen) {
+            _showGameOverDialog();
+          }
+        });
       }
     });
 
@@ -249,7 +273,7 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
 
     final bgColor = isEyeComfort
         ? const Color(0xFFF6EEDF)
-        : const Color(0xFFF7F8FA);
+        : const Color(0xFFE8EEF5);
 
     final totalArrows = gameState.level.arrows.length;
     final remaining = gameState.remainingArrows;
@@ -268,7 +292,10 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
               difficulty: gameState.level.difficulty,
               remainingArrows: remaining,
               elapsedSeconds: gameState.elapsedSeconds,
-              onPause: _showPauseDialog,
+              onPause: () {
+                ref.read(soundProvider).playClick();
+                _showPauseDialog();
+              },
               isDaily: gameState.isDailyChallenge,
               onToggleTheme: () {
                 ref.read(gameControllerProvider.notifier).toggleTheme();
@@ -354,6 +381,7 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
                   onArrowTapped: _onArrowTapped,
                   activeHintId: gameState.activeHintId,
                   isEyeComfortTheme: isEyeComfort,
+                  showHitAreas: kDebugMode && ref.watch(debugShowHitAreasProvider),
                 ),
               ),
             ),
@@ -363,15 +391,20 @@ class _GameplayScreenState extends ConsumerState<GameplayScreen> {
               canUndo: gameState.canUndo,
               hintsRemaining: gameState.hintsRemaining,
               onUndo: () {
+                ref.read(soundProvider).playClick();
                 ref.read(gameControllerProvider.notifier).undo();
                 _boardKey.currentState?.resetAnimations();
               },
               onHint: _onHintPressed,
               onRestart: () {
+                ref.read(soundProvider).playClick();
                 ref.read(gameControllerProvider.notifier).restart();
                 _boardKey.currentState?.resetAnimations();
               },
             ),
+
+            // 6. Anchored Adaptive Banner Ad (placed below controls, never covers board)
+            const BannerAdWidget(),
           ],
         ),
       ),

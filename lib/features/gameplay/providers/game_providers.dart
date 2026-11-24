@@ -29,6 +29,15 @@ final purchaseProvider = Provider<PurchaseService>((ref) {
   return PurchaseService();
 });
 
+class DebugShowHitAreasNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void toggle(bool value) => state = value;
+}
+
+final debugShowHitAreasProvider =
+    NotifierProvider<DebugShowHitAreasNotifier, bool>(DebugShowHitAreasNotifier.new);
+
 final levelRepoProvider = Provider<LevelRepository>((ref) {
   return LevelRepository();
 });
@@ -144,10 +153,21 @@ class GameController extends Notifier<GameState> {
     );
   }
 
+  bool _isPaused = false;
+
+  void pause() {
+    _isPaused = true;
+  }
+
+  void resume() {
+    _isPaused = false;
+  }
+
   void _startTimer() {
+    _isPaused = false;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!state.isWon && !state.isGameOver) {
+      if (!state.isWon && !state.isGameOver && !_isPaused) {
         state = state.copyWith(elapsedSeconds: state.elapsedSeconds + 1);
       }
     });
@@ -339,8 +359,9 @@ class GameController extends Notifier<GameState> {
     state = state.copyWith(isEyeComfortTheme: newTheme);
   }
 
-  /// Loads a new level.
+  /// Loads a new level and persists current progression.
   void loadLevel(int levelNumber) {
+    ref.read(storageProvider).setCurrentLevel(levelNumber);
     final repo = ref.read(levelRepoProvider);
     final newLevel = repo.getLevel(levelNumber);
     _initLevel(newLevel, isDaily: false);
