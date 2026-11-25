@@ -5,10 +5,10 @@
         android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <!-- Sample AdMob App ID for testing and verification -->
+        <!-- AdMob App ID (Eklavyasaim) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-8510368268823172~5543797564"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

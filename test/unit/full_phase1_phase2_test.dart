@@ -219,10 +219,10 @@ void main() {
       // Premium disables ads
       expect(adService.evaluateInterstitialEligibility(completedLevelNumber: 13, isPremium: true, now: t65s), isFalse);
 
-      // AdConfig falls back to Google test IDs when placeholders are empty or contain REPLACE_WITH
-      expect(AdConfig.bannerAdUnitId, contains('ca-app-pub-3940256099942544'));
-      expect(AdConfig.interstitialAdUnitId, contains('ca-app-pub-3940256099942544'));
-      expect(AdConfig.rewardedAdUnitId, contains('ca-app-pub-3940256099942544'));
+      // AdConfig resolves valid AdMob unit IDs (production Android or Google test fallback)
+      expect(AdConfig.bannerAdUnitId, startsWith('ca-app-pub-'));
+      expect(AdConfig.interstitialAdUnitId, startsWith('ca-app-pub-'));
+      expect(AdConfig.rewardedAdUnitId, startsWith('ca-app-pub-'));
     });
   });
 

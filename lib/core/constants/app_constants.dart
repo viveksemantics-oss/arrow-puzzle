@@ -9,11 +9,10 @@ class AppConstants {
   static const int hintsRewardAmount = 2;
   static const int interstitialFrequency = 3; // Show every 3 level completions
 
-  // AdMob Test Ad Unit IDs (Google Official Test IDs)
-  // Android
-  static const String androidBannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
-  static const String androidInterstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
-  static const String androidRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
+  // AdMob Production Ad Unit IDs (Android - Eklavya's Aim)
+  static const String androidBannerAdUnitId = 'ca-app-pub-8510368268823172/5296511861';
+  static const String androidInterstitialAdUnitId = 'ca-app-pub-8510368268823172/6138373130';
+  static const String androidRewardedAdUnitId = 'ca-app-pub-8510368268823172/8480631294';
 
   // iOS
   static const String iosBannerAdUnitId = 'ca-app-pub-3940256099942544/2934735716';

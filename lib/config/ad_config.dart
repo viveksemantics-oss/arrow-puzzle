@@ -22,12 +22,12 @@ class AdConfig {
   static const String testIosRewardedId = 'ca-app-pub-3940256099942544/1712485313';
 
   // -------------------------------------------------------------
-  // Production Ad Unit IDs (Placeholders - Fill before Play Store release)
+  // Production Ad Unit IDs (Configured for Eklavya's Aim)
   // -------------------------------------------------------------
-  static const String prodAndroidAppId = '';
-  static const String prodAndroidBannerId = '';
-  static const String prodAndroidInterstitialId = '';
-  static const String prodAndroidRewardedId = '';
+  static const String prodAndroidAppId = 'ca-app-pub-8510368268823172~5543797564';
+  static const String prodAndroidBannerId = 'ca-app-pub-8510368268823172/5296511861';
+  static const String prodAndroidInterstitialId = 'ca-app-pub-8510368268823172/6138373130';
+  static const String prodAndroidRewardedId = 'ca-app-pub-8510368268823172/8480631294';
 
   static const String prodIosAppId = '';
   static const String prodIosBannerId = '';
